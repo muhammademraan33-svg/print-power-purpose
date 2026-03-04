@@ -145,6 +145,28 @@ async function getSinaLiteProducts(token) {
   return res.json()
 }
 
+/** Fetches and groups options for a single SinaLite product. Returns [] on any failure. */
+async function getSinaLiteProductOptions(token, productId) {
+  try {
+    const res = await fetch(`${SINALITE_API_URL}/product/${productId}/option`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    // API can return [[...]] or [...]
+    const flat = Array.isArray(data[0]) ? data[0] : (Array.isArray(data) ? data : [])
+    const grouped = {}
+    for (const opt of flat) {
+      if (!opt.group || opt.hidden) continue
+      if (!grouped[opt.group]) grouped[opt.group] = []
+      if (!grouped[opt.group].includes(opt.name)) grouped[opt.group].push(opt.name)
+    }
+    return Object.entries(grouped).map(([name, values]) => ({ name, values }))
+  } catch {
+    return []
+  }
+}
+
 // ── Popular blueprint IDs to include from Printify catalog ──────────────────
 // These are well-known popular apparel/accessory items
 const POPULAR_BLUEPRINT_IDS = [
@@ -207,12 +229,17 @@ async function main() {
     const activeProducts = rawProducts.filter(p => p.enabled === 1)
     console.log(`✅ ${activeProducts.length} active products`)
 
+    console.log('  Fetching options for each product (this takes ~30s)...')
     for (let i = 0; i < activeProducts.length; i++) {
       const p = activeProducts[i]
-      process.stdout.write(`\r  Processing ${i + 1}/${activeProducts.length}: ${p.name.slice(0, 50).padEnd(50)}`)
+      process.stdout.write(`\r  [${i + 1}/${activeProducts.length}] ${p.name.slice(0, 55).padEnd(55)}`)
 
-      // Note: Options are fetched on-demand via the SinaLite API when the user views a product
-      // We only store essential fields here to keep the JSON small
+      // Fetch options and store them so production doesn't need a live API call
+      const options = await getSinaLiteProductOptions(token, p.id)
+
+      // Small delay to avoid rate-limiting (200 ms per product)
+      await new Promise(resolve => setTimeout(resolve, 200))
+
       sinaliteProducts.push({
         id: p.id,
         sku: p.sku,
@@ -220,10 +247,11 @@ async function main() {
         category: p.category,
         image: getImageForCategory(p.category),
         description: `Professional ${p.name} printing. High-quality results with fast turnaround.`,
+        options,   // ← stored so ProductDetail can read them without an API call
         source: 'sinalite',
       })
     }
-    console.log('\n✅ SinaLite products processed')
+    console.log('\n✅ SinaLite products + options processed')
   } catch (err) {
     console.error('\n❌ SinaLite error:', err.message)
   }

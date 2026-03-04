@@ -67,11 +67,19 @@ export default function ProductDetail() {
   const localProducts = (sinaliteData as any).products as any[]
   const localProduct  = localProducts.find((p: any) => String(p.id) === String(id))
 
-  const { data: optionGroups, isLoading: optionsLoading } = useQuery({
+  // Options stored in JSON (populated by npm run sync:products) — works in production
+  const localOptions: SinaliteOptionGroup[] =
+    Array.isArray(localProduct?.options) ? localProduct.options : []
+
+  // Only hit the live API when local options are absent (dev proxy required)
+  const { data: apiOptions, isLoading: optionsLoading } = useQuery({
     queryKey: ['product-options', id, source],
     queryFn: () => fetchSinaLiteOptions(id!),
-    enabled: !!id && source === 'sinalite',
+    enabled: !!id && source === 'sinalite' && localOptions.length === 0,
   })
+
+  // Prefer local (JSON) options; fall back to live API options
+  const optionGroups = localOptions.length > 0 ? localOptions : apiOptions
 
   const handleAddToCart = async () => {
     if (!localProduct) return
@@ -265,7 +273,7 @@ export default function ProductDetail() {
             {source === 'sinalite' && (
               <div className="bg-white rounded-2xl border border-border/50 p-5 shadow-sm">
                 <h3 className="font-semibold mb-4 text-base">Product Options</h3>
-                {optionsLoading ? (
+                {optionsLoading && localOptions.length === 0 ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading options…
