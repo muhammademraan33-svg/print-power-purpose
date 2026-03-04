@@ -1,0 +1,16 @@
+{
+  "env": {
+    "deno": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "no-undef": "off"
+  },
+  "globals": {
+    "Deno": "readonly"
+  }
+}
