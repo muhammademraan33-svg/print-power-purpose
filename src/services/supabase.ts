@@ -1,10 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Hardcoded project URL — safe to expose (it's public)
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL || 'https://cdglodnhpopswiodxizy.supabase.co'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+// Anon key — must be set in your hosting platform's env vars (Netlify / Vercel dashboard)
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+
+if (!supabaseAnonKey) {
+  console.warn(
+    '⚠️  VITE_SUPABASE_ANON_KEY is not set. ' +
+    'Add it in your Netlify / Vercel environment-variable settings. ' +
+    'Supabase features (checkout, orders) will be unavailable until then.'
+  )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// createClient does NOT throw on empty strings; requests simply return 401.
+// Using a placeholder keeps the app loading even before the key is configured.
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey || 'supabase-key-not-configured'
+)
