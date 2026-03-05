@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Trash2, Minus, Plus, ShoppingCart, Loader2,
-  Heart, Shield, ChevronRight, ArrowRight, Package,
+  Heart, Shield, ChevronRight, ArrowRight, Package, CheckCircle2, FileImage,
 } from 'lucide-react'
 import { formatPrice, calculateDonation } from '@/lib/utils'
 import { stripeApi } from '@/services/stripe'
@@ -35,8 +35,15 @@ export default function Cart() {
     try {
       const session = await stripeApi.createCheckoutSession({
         items: items.map((item) => ({
-          id: item.id, name: item.name, priceCents: item.priceCents,
-          quantity: item.quantity, imageUrl: item.imageUrl,
+          id:            item.id,
+          name:          item.name,
+          priceCents:    item.priceCents,
+          quantity:      item.quantity,
+          imageUrl:      item.imageUrl,
+          artworkUrl:    item.artworkUrl,
+          preflightHash: item.preflightHash,
+          designId:      item.designId,
+          configuration: item.configuration,
         })),
         donationCents,
         additionalDonationCents: additionalDonation > 0 ? additionalDonation : undefined,
@@ -130,9 +137,37 @@ export default function Cart() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-base mb-1 truncate">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
+                    <p className="text-sm text-muted-foreground mb-2">
                       {formatPrice(item.priceCents)} each
                     </p>
+
+                    {/* Design file status */}
+                    {item.artworkUrl ? (
+                      <div className="flex items-center gap-2 mb-3">
+                        {/* Show thumbnail only if it's a real URL (not base64 which is huge) */}
+                        {item.artworkUrl.startsWith('https://') && (
+                          <a href={item.artworkUrl} target="_blank" rel="noopener noreferrer"
+                             className="shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-emerald-200
+                                        hover:opacity-80 transition-opacity" title="View print file">
+                            <img src={item.artworkUrl} alt="Design" className="w-full h-full object-cover" />
+                          </a>
+                        )}
+                        <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full
+                          ${item.artworkUrl.startsWith('https://')
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-blue-100 text-blue-700'}`}>
+                          <CheckCircle2 className="w-3 h-3" />
+                          {item.artworkUrl.startsWith('https://') ? 'Print file uploaded ✓' : 'Print file ready ✓'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50
+                                      border border-amber-200 rounded-full px-2.5 py-1 w-fit mb-3">
+                        <FileImage className="w-3 h-3" />
+                        No design attached
+                      </div>
+                    )}
+
 
                     {/* Controls row */}
                     <div className="flex items-center gap-3 flex-wrap">

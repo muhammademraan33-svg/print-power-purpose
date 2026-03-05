@@ -18,6 +18,14 @@ export const stripeApi = {
       priceCents: number
       quantity: number
       imageUrl?: string
+      /** URL of the finalized print-ready file — sent to SinaLite /order/new */
+      artworkUrl?: string
+      /** Design session ID used by the backend /finalize endpoint */
+      designId?: string
+      /** Hash to verify design hasn't changed since preflight */
+      preflightHash?: string
+      /** Selected product options (size, paper, finish, etc.) */
+      configuration?: Record<string, any>
     }>
     donationCents: number
     additionalDonationCents?: number

@@ -1,18 +1,19 @@
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Loader2, AlertTriangle, Package, ChevronRight, ShoppingCart,
-  Check, Minus, Plus, Shield, Truck, Heart,
+  Check, Minus, Plus, Shield, Truck, Heart, CheckCircle2,
 } from 'lucide-react'
 import { formatPrice, calculateDonation } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
-import ProductDesigner from '@/components/product/ProductDesigner'
+import ProductDesigner, { type DesignerRef } from '@/components/product/ProductDesigner'
 import sinaliteData from '@/data/sinaliteProducts.json'
+import { supabase } from '@/services/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SinaliteOption       { id: number; group: string; name: string; hidden: number }
@@ -51,6 +52,39 @@ async function fetchSinaLiteOptions(productId: string | number): Promise<Sinalit
   return Object.entries(grouped).map(([name, values]) => ({ name, values }))
 }
 
+/** Upload design PNG dataUrl to Supabase Storage.
+ *  Returns public URL on success, null if Supabase is not configured / upload fails. */
+async function uploadDesignToSupabase(
+  dataUrl: string,
+  productId: string,
+): Promise<string | null> {
+  try {
+    // Base64 → Blob
+    const base64 = dataUrl.split(',')[1]
+    if (!base64) return null
+    const bytes = atob(base64)
+    const arr   = new Uint8Array(bytes.length)
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+    const blob = new Blob([arr], { type: 'image/png' })
+
+    const fileName = `designs/${productId}-${Date.now()}.png`
+    const { data, error } = await supabase.storage
+      .from('designs')
+      .upload(fileName, blob, { contentType: 'image/png', upsert: false })
+
+    if (error || !data) {
+      console.warn('Supabase upload failed (bucket may not exist yet):', error?.message)
+      return null
+    }
+
+    const { data: urlData } = supabase.storage.from('designs').getPublicUrl(data.path)
+    return urlData.publicUrl
+  } catch (err) {
+    console.warn('Supabase upload error:', err)
+    return null
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
@@ -59,18 +93,23 @@ export default function ProductDetail() {
   const navigate  = useNavigate()
   const { addItem } = useCart()
 
-  const [quantity, setQuantity]           = useState(1)
-  const [artworkUrl, setArtworkUrl]       = useState<string | null>(null)
+  const [quantity, setQuantity]             = useState(1)
+  const [artworkUrl, setArtworkUrl]         = useState<string | null>(null)
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({})
+
+  // Finalize flow state
+  const [finalizing, setFinalizing]         = useState(false)
+  const [finalizeErrors, setFinalizeErrors] = useState<string[]>([])
+  const [designReady, setDesignReady]       = useState(false)
+
+  const designerRef = useRef<DesignerRef>(null)
 
   const localProducts = (sinaliteData as any).products as any[]
   const localProduct  = localProducts.find((p: any) => String(p.id) === String(id))
 
-  // Options stored in JSON (populated by npm run sync:products)
   const localOptions: SinaliteOptionGroup[] =
     Array.isArray(localProduct?.options) ? localProduct.options : []
 
-  // Only hit the live API when local options are absent (dev proxy required)
   const { data: apiOptions, isLoading: optionsLoading } = useQuery({
     queryKey: ['product-options', id, source],
     queryFn:  () => fetchSinaLiteOptions(id!),
@@ -79,27 +118,77 @@ export default function ProductDetail() {
 
   const optionGroups = localOptions.length > 0 ? localOptions : apiOptions
 
-  // Derive selected size for the canvas ratio
   const selectedSizeValue: string | undefined = (() => {
     const sizeKey = Object.keys(selectedOptions).find(k => k.toLowerCase().includes('size'))
     return sizeKey ? selectedOptions[sizeKey] : undefined
   })()
 
-  const handleAddToCart = () => {
+  // ── Add to Cart: runs finalize preflight, uploads design, then adds item ───
+  const handleAddToCart = async () => {
     if (!localProduct) return
-    addItem({
-      id:           localProduct.id.toString(),
-      productId:    typeof localProduct.id === 'number' ? localProduct.id : 0,
-      name:         localProduct.name,
-      priceCents:   5000,
-      quantity,
-      imageUrl:     localProduct.image || undefined,
-      configuration: selectedOptions,
-      artworkUrl:   artworkUrl || undefined,
-      vendor:       source as 'sinalite' | 'printify' | 'woocommerce',
-    })
-    toast('Added to cart!', 'success')
-    navigate('/cart')
+    setFinalizeErrors([])
+
+    // If designer has content, run finalize + preflight
+    if (designerRef.current?.hasContent()) {
+      setFinalizing(true)
+      toast('Preparing your print file…', 'success')
+
+      const result = await designerRef.current.finalize()
+
+      if (!result.pass) {
+        setFinalizeErrors(result.errors)
+        setFinalizing(false)
+        toast(`Design issue: ${result.errors[0]}`, 'error')
+        return
+      }
+
+      // Try Supabase upload (graceful fallback to dataUrl)
+      let uploadedUrl = result.dataUrl
+      if (result.dataUrl) {
+        const supabaseUrl = await uploadDesignToSupabase(result.dataUrl, String(localProduct.id))
+        if (supabaseUrl) {
+          uploadedUrl = supabaseUrl
+          toast('Print file uploaded to storage ✓', 'success')
+        } else {
+          toast('Stored design locally (Supabase not yet configured)', 'success')
+        }
+        setArtworkUrl(uploadedUrl)
+        setDesignReady(true)
+      }
+
+      setFinalizing(false)
+      addItem({
+        id:            localProduct.id.toString(),
+        productId:     typeof localProduct.id === 'number' ? localProduct.id : 0,
+        name:          localProduct.name,
+        priceCents:    5000,
+        quantity,
+        imageUrl:      localProduct.image || undefined,
+        configuration: selectedOptions,
+        artworkUrl:    uploadedUrl || undefined,
+        designId:      result.designId,
+        preflightHash: result.preflightHash,
+        vendor:        source as 'sinalite' | 'printify' | 'woocommerce',
+      })
+      toast('Added to cart!', 'success')
+      navigate('/cart')
+
+    } else {
+      // No design — add directly
+      addItem({
+        id:           localProduct.id.toString(),
+        productId:    typeof localProduct.id === 'number' ? localProduct.id : 0,
+        name:         localProduct.name,
+        priceCents:   5000,
+        quantity,
+        imageUrl:     localProduct.image || undefined,
+        configuration: selectedOptions,
+        artworkUrl:   artworkUrl || undefined,
+        vendor:       source as 'sinalite' | 'printify' | 'woocommerce',
+      })
+      toast('Added to cart!', 'success')
+      navigate('/cart')
+    }
   }
 
   // ── Not found ──────────────────────────────────────────────────────────────
@@ -118,9 +207,7 @@ export default function ProductDetail() {
 
   const donationCents = calculateDonation(5000 * quantity)
 
-  // ─── Reusable "right column" content blocks ────────────────────────────────
-  // Defined once and rendered in two different orders depending on screen size.
-
+  // ─── Reusable content blocks ──────────────────────────────────────────────
   const TitleBlock = (
     <div>
       <div className="flex flex-wrap gap-2 mb-3">
@@ -147,10 +234,10 @@ export default function ProductDetail() {
         <div>
           <h4 className="font-semibold text-amber-800 text-sm mb-1.5">Artwork Specifications</h4>
           <ul className="text-xs text-amber-700 space-y-1">
-            <li>• PDF format preferred (AI, EPS, TIFF accepted)</li>
             <li>• 300 DPI resolution · CMYK color mode</li>
-            <li>• 0.125" bleed on all edges</li>
-            <li>• Keep text 0.25" from trim edge</li>
+            <li>• 0.125" bleed on all edges (built in to designer)</li>
+            <li>• Keep text 0.25" from trim edge (inside safe area)</li>
+            <li>• Designer generates print-ready file automatically</li>
           </ul>
         </div>
       </div>
@@ -246,18 +333,52 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Add to cart — desktop / tablet only (mobile uses sticky bar below) */}
+      {/* Finalize errors */}
+      {finalizeErrors.length > 0 && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-1">
+          <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Fix these before adding to cart:
+          </p>
+          {finalizeErrors.map((e, i) => (
+            <p key={i} className="text-xs text-red-600">• {e}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Design ready badge */}
+      {designReady && !finalizeErrors.length && (
+        <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50
+                        border border-emerald-200 rounded-xl px-3 py-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Print file ready — design passed all quality checks.
+        </div>
+      )}
+
+      {/* Add to cart — desktop / tablet */}
       <Button
         size="lg"
         className="hidden sm:flex w-full h-14 text-base font-semibold gap-3 shadow-lg
-                   shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all"
+                   shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all
+                   disabled:opacity-60 disabled:pointer-events-none"
         onClick={handleAddToCart}
+        disabled={finalizing}
       >
-        <ShoppingCart className="w-5 h-5" /> Add to Cart
+        {finalizing
+          ? <><Loader2 className="w-5 h-5 animate-spin" /> Preparing print file…</>
+          : <><ShoppingCart className="w-5 h-5" /> Add to Cart</>
+        }
       </Button>
-      <p className="hidden sm:block text-xs text-muted-foreground text-center">
-        Final price calculated based on your selected options and quantity.
-      </p>
+
+      {finalizing && (
+        <p className="hidden sm:block text-xs text-muted-foreground text-center">
+          Generating 300 DPI print file and running quality checks…
+        </p>
+      )}
+      {!finalizing && (
+        <p className="hidden sm:block text-xs text-muted-foreground text-center">
+          Final price calculated based on your selected options and quantity.
+        </p>
+      )}
 
       {/* Trust pills */}
       <div className="flex flex-wrap gap-3 pt-1">
@@ -292,31 +413,19 @@ export default function ProductDetail() {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-12
-                      pb-24 sm:pb-6">  {/* pb-24 on mobile = space for sticky CTA */}
-
-        {/* ── MOBILE LAYOUT: single column, natural reading order ──────────── */}
-        {/* Title → Options (pick size first) → Image → Designer → Qty        */}
-        {/* ── DESKTOP LAYOUT: 2-column grid (left = image+designer, right = info) */}
+                      pb-24 sm:pb-6">
 
         <div className="flex flex-col lg:grid lg:grid-cols-2 lg:gap-12 xl:gap-16 gap-5">
 
-          {/* ═══ RIGHT COLUMN content — appears FIRST on mobile ═══════════ */}
+          {/* ═══ RIGHT COLUMN — appears FIRST on mobile ═════════════════ */}
           <div className="order-1 lg:order-2 space-y-5">
-
-            {/* Title */}
             {TitleBlock}
-
-            {/* Artwork specs */}
             {SpecsBlock}
-
-            {/* Options */}
             {OptionsBlock}
-
-            {/* Qty + Cart (hidden on small mobile — shown in sticky bar) */}
             {QtyCartBlock}
           </div>
 
-          {/* ═══ LEFT COLUMN content — appears SECOND on mobile ══════════ */}
+          {/* ═══ LEFT COLUMN — appears SECOND on mobile ══════════════════ */}
           <div className="order-2 lg:order-1 space-y-5">
 
             {/* Product image */}
@@ -343,6 +452,7 @@ export default function ProductDetail() {
 
             {/* Designer */}
             <ProductDesigner
+              ref={designerRef}
               productId={typeof localProduct.id === 'number' ? localProduct.id : 0}
               onDesignExport={setArtworkUrl}
               selectedSize={selectedSizeValue}
@@ -352,7 +462,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* ── STICKY ADD TO CART — mobile only (sm and below) ─────────────────── */}
+      {/* ── STICKY ADD TO CART — mobile only ─────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden
                       bg-background/97 backdrop-blur-md border-t border-border shadow-2xl">
         <div className="px-4 py-3 flex items-center gap-3">
@@ -373,12 +483,22 @@ export default function ProductDetail() {
           </div>
           <Button
             size="lg"
-            className="flex-1 h-12 font-semibold gap-2 shadow-lg shadow-primary/25"
+            className="flex-1 h-12 font-semibold gap-2 shadow-lg shadow-primary/25
+                       disabled:opacity-60 disabled:pointer-events-none"
             onClick={handleAddToCart}
+            disabled={finalizing}
           >
-            <ShoppingCart className="w-4 h-4" /> Add to Cart
+            {finalizing
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
+              : <><ShoppingCart className="w-4 h-4" /> Add to Cart</>
+            }
           </Button>
         </div>
+        {finalizing && (
+          <p className="text-[10px] text-muted-foreground text-center pb-1">
+            Generating print file & running quality checks…
+          </p>
+        )}
       </div>
 
     </div>

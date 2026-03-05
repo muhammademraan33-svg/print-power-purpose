@@ -97,7 +97,12 @@ export interface CartItem {
   imageUrl?: string
   configuration?: Record<string, any>
   artworkFileName?: string
+  /** URL to the finalised print-ready PNG stored in Supabase (or base64 dataUrl as fallback). */
   artworkUrl?: string
+  /** Unique ID for this design session (used by backend /finalize endpoint). */
+  designId?: string
+  /** Hash of the design state at time of finalisation — used at checkout to detect changes. */
+  preflightHash?: string
   vendor?: 'woocommerce' | 'sinalite' | 'printify'
   vendorProductId?: string
 }
