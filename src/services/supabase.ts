@@ -1,11 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Hardcoded project URL — safe to expose (it's public)
+// Project URL — safe to expose (it's public)
 const supabaseUrl =
-  import.meta.env.VITE_SUPABASE_URL || 'https://cdglodnhpopswiodxizy.supabase.co'
+  import.meta.env.VITE_SUPABASE_URL || 'https://aogzhcbuuxyrcwjcvfkq.supabase.co'
 
-// Anon key — must be set in your hosting platform's env vars (Netlify / Vercel dashboard)
+// Anon key — for read-only / authenticated user operations
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+
+// Service-role key — used ONLY for storage uploads (bypasses RLS for the designs bucket)
+// ⚠️  Move uploads to a Supabase Edge Function in production to keep this key server-side.
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
 
 if (!supabaseAnonKey) {
   console.warn(
@@ -15,9 +19,16 @@ if (!supabaseAnonKey) {
   )
 }
 
-// createClient does NOT throw on empty strings; requests simply return 401.
-// Using a placeholder keeps the app loading even before the key is configured.
+// Standard anon client — for all read operations and auth
 export const supabase = createClient(
   supabaseUrl,
   supabaseAnonKey || 'supabase-key-not-configured'
+)
+
+/** Admin client — ONLY used for storage uploads to the designs bucket.
+ *  Uses service_role to bypass RLS; do NOT use for user-facing data queries. */
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  supabaseServiceKey || supabaseAnonKey || 'supabase-key-not-configured',
+  { auth: { autoRefreshToken: false, persistSession: false } }
 )

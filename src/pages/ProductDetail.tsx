@@ -13,7 +13,7 @@ import { formatPrice, calculateDonation } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 import ProductDesigner, { type DesignerRef } from '@/components/product/ProductDesigner'
 import sinaliteData from '@/data/sinaliteProducts.json'
-import { supabase } from '@/services/supabase'
+import { supabaseAdmin } from '@/services/supabase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SinaliteOption       { id: number; group: string; name: string; hidden: number }
@@ -68,7 +68,7 @@ async function uploadDesignToSupabase(
     const blob = new Blob([arr], { type: 'image/png' })
 
     const fileName = `designs/${productId}-${Date.now()}.png`
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseAdmin.storage
       .from('designs')
       .upload(fileName, blob, { contentType: 'image/png', upsert: false })
 
@@ -77,7 +77,7 @@ async function uploadDesignToSupabase(
       return null
     }
 
-    const { data: urlData } = supabase.storage.from('designs').getPublicUrl(data.path)
+    const { data: urlData } = supabaseAdmin.storage.from('designs').getPublicUrl(data.path)
     return urlData.publicUrl
   } catch (err) {
     console.warn('Supabase upload error:', err)
