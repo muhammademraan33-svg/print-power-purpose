@@ -12,6 +12,7 @@ import {
 import { formatPrice, calculateDonation } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
 import ProductDesigner, { type DesignerRef } from '@/components/product/ProductDesigner'
+import ApparelDesigner from '@/components/product/ApparelDesigner'
 import sinaliteData from '@/data/sinaliteProducts.json'
 import { supabaseAdmin } from '@/services/supabase'
 
@@ -116,7 +117,11 @@ export default function ProductDetail() {
     enabled:  !!id && source === 'sinalite' && localOptions.length === 0,
   })
 
-  const optionGroups = localOptions.length > 0 ? localOptions : apiOptions
+  // For SinaLite: use local options (or API fallback)
+  // For Printify: options are baked into the product JSON (sizes/colors)
+  const optionGroups = source === 'printify'
+    ? (localOptions.length > 0 ? localOptions : [])
+    : (localOptions.length > 0 ? localOptions : apiOptions)
 
   const selectedSizeValue: string | undefined = (() => {
     const sizeKey = Object.keys(selectedOptions).find(k => k.toLowerCase().includes('size'))
@@ -227,7 +232,22 @@ export default function ProductDetail() {
     </div>
   )
 
-  const SpecsBlock = (
+  const SpecsBlock = source === 'printify' ? (
+    <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h4 className="font-semibold text-purple-800 text-sm mb-1.5">Print-on-Demand via Printify</h4>
+          <ul className="text-xs text-purple-700 space-y-1">
+            <li>• Upload PNG with transparent background for best results</li>
+            <li>• Recommended design size: 4500 × 5400 px (15" × 18" @ 300 DPI)</li>
+            <li>• Printed & shipped directly by Printify print partner</li>
+            <li>• Drag your design to reposition · use zoom buttons to scale</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  ) : (
     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -244,6 +264,7 @@ export default function ProductDetail() {
     </div>
   )
 
+  // Options sidebar block — only for SinaLite (Printify options live inside ApparelDesigner)
   const OptionsBlock = source === 'sinalite' ? (
     <div className="bg-white rounded-2xl border border-border/50 p-4 sm:p-5 shadow-sm">
       <h3 className="font-semibold mb-4 text-base">Product Options</h3>
@@ -428,35 +449,53 @@ export default function ProductDetail() {
           {/* ═══ LEFT COLUMN — appears SECOND on mobile ══════════════════ */}
           <div className="order-2 lg:order-1 space-y-5">
 
-            {/* Product image */}
-            <div className="rounded-2xl sm:rounded-3xl overflow-hidden bg-muted
-                            aspect-[4/3] sm:aspect-[3/2] lg:aspect-square
-                            shadow-lg border border-border/30">
-              {localProduct.image ? (
-                <img
-                  src={localProduct.image}
-                  alt={localProduct.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=800&q=80'
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                  <Package className="h-16 w-16 text-muted-foreground/30" />
-                  <span className="text-sm text-muted-foreground">No image available</span>
+            {source === 'printify' ? (
+              /* ── Printify apparel: show mockup + overlay designer ── */
+              <ApparelDesigner
+                ref={designerRef}
+                productId={localProduct.id}
+                productImage={localProduct.image || null}
+                productName={localProduct.name}
+                category={localProduct.category}
+                onDesignExport={setArtworkUrl}
+                selectedOptions={selectedOptions}
+                onOptionChange={(name, value) => setSelectedOptions(prev => ({ ...prev, [name]: value }))}
+                optionGroups={optionGroups ?? []}
+              />
+            ) : (
+              /* ── SinaLite flat-print product ── */
+              <>
+                {/* Product image */}
+                <div className="rounded-2xl sm:rounded-3xl overflow-hidden bg-muted
+                                aspect-[4/3] sm:aspect-[3/2] lg:aspect-square
+                                shadow-lg border border-border/30">
+                  {localProduct.image ? (
+                    <img
+                      src={localProduct.image}
+                      alt={localProduct.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=800&q=80'
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                      <Package className="h-16 w-16 text-muted-foreground/30" />
+                      <span className="text-sm text-muted-foreground">No image available</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Designer */}
-            <ProductDesigner
-              ref={designerRef}
-              productId={typeof localProduct.id === 'number' ? localProduct.id : 0}
-              onDesignExport={setArtworkUrl}
-              selectedSize={selectedSizeValue}
-            />
+                {/* Canvas print designer */}
+                <ProductDesigner
+                  ref={designerRef}
+                  productId={typeof localProduct.id === 'number' ? localProduct.id : 0}
+                  onDesignExport={setArtworkUrl}
+                  selectedSize={selectedSizeValue}
+                />
+              </>
+            )}
           </div>
 
         </div>

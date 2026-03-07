@@ -12348,7 +12348,40 @@
       "description": "Custom printed Unisex Cotton Crew Tee by Next Level. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 5,
-      "brand": "Next Level"
+      "brand": "Next Level",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_6",
@@ -12359,7 +12392,40 @@
       "description": "Custom printed Unisex Heavy Cotton Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 6,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_9",
@@ -12370,7 +12436,40 @@
       "description": "Custom printed Women's Favorite Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 9,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_12",
@@ -12381,7 +12480,40 @@
       "description": "Custom printed Unisex Jersey Short Sleeve Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 12,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_77",
@@ -12392,7 +12524,37 @@
       "description": "Custom printed Unisex Heavy Blend™ Hooded Sweatshirt by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 77,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_92",
@@ -12403,7 +12565,37 @@
       "description": "Custom printed Unisex College Hoodie by AWDIS. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 92,
-      "brand": "AWDIS"
+      "brand": "AWDIS",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_146",
@@ -12414,7 +12606,40 @@
       "description": "Custom printed Kids Fine Jersey Tee by LAT Apparel. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 146,
-      "brand": "LAT Apparel"
+      "brand": "LAT Apparel",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_357",
@@ -12425,7 +12650,36 @@
       "description": "Custom printed Accessory Pouch w T-bottom by Generic brand. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 357,
-      "brand": "Generic brand"
+      "brand": "Generic brand",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_429",
@@ -12436,7 +12690,36 @@
       "description": "Custom printed Laptop Sleeve by Generic brand. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 429,
-      "brand": "Generic brand"
+      "brand": "Generic brand",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_515",
@@ -12447,7 +12730,36 @@
       "description": "Custom printed Spiral Notebook by Generic brand. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 515,
-      "brand": "Generic brand"
+      "brand": "Generic brand",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_11",
@@ -12458,7 +12770,40 @@
       "description": "Custom printed Women's Jersey Short Sleeve Deep V-Neck Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 11,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_14",
@@ -12469,7 +12814,40 @@
       "description": "Custom printed The Boyfriend Tee for Women by Next Level. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 14,
-      "brand": "Next Level"
+      "brand": "Next Level",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_15",
@@ -12480,7 +12858,40 @@
       "description": "Custom printed Men's Very Important Tee by District. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 15,
-      "brand": "District"
+      "brand": "District",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_26",
@@ -12491,7 +12902,40 @@
       "description": "Custom printed Men's Lightweight Fashion Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 26,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_32",
@@ -12502,7 +12946,40 @@
       "description": "Custom printed Toddler's Fine Jersey Tee by Rabbit Skins. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 32,
-      "brand": "Rabbit Skins"
+      "brand": "Rabbit Skins",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_34",
@@ -12513,7 +12990,40 @@
       "description": "Custom printed Infant Fine Jersey Tee by Rabbit Skins. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 34,
-      "brand": "Rabbit Skins"
+      "brand": "Rabbit Skins",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_36",
@@ -12524,7 +13034,40 @@
       "description": "Custom printed Unisex Ultra Cotton Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 36,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_41",
@@ -12535,7 +13078,40 @@
       "description": "Custom printed Unisex Jersey Long Sleeve Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 41,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_45",
@@ -12546,7 +13122,40 @@
       "description": "Custom printed Men's Long Sleeve Crew Tee by Next Level. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 45,
-      "brand": "Next Level"
+      "brand": "Next Level",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_48",
@@ -12557,7 +13166,40 @@
       "description": "Custom printed Unisex Jersey Short Sleeve V-Neck Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 48,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_49",
@@ -12568,7 +13210,37 @@
       "description": "Custom printed Unisex Heavy Blend™ Crewneck Sweatshirt by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 49,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_65",
@@ -12579,7 +13251,37 @@
       "description": "Custom printed Kids Sweatshirt by AWDIS. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 65,
-      "brand": "AWDIS"
+      "brand": "AWDIS",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_66",
@@ -12590,7 +13292,37 @@
       "description": "Custom printed Unisex Heavy Blend™ Full Zip Hooded Sweatshirt by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 66,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_67",
@@ -12601,7 +13333,37 @@
       "description": "Custom printed Kids Hoodie by AWDIS. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 67,
-      "brand": "AWDIS"
+      "brand": "AWDIS",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Sport Grey",
+            "Forest Green",
+            "Maroon"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_68",
@@ -12612,7 +13374,27 @@
       "description": "Custom printed Mug 11oz by Generic brand. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 68,
-      "brand": "Generic brand"
+      "brand": "Generic brand",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "11oz",
+            "15oz"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "White",
+            "Black"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_70",
@@ -12623,7 +13405,40 @@
       "description": "Custom printed Stainless Steel Travel Mug by Generic brand. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 70,
-      "brand": "Generic brand"
+      "brand": "Generic brand",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_79",
@@ -12634,7 +13449,40 @@
       "description": "Custom printed Unisex 3\\4 Sleeve Baseball Tee by Bella+Canvas. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 79,
-      "brand": "Bella+Canvas"
+      "brand": "Bella+Canvas",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_80",
@@ -12645,7 +13493,40 @@
       "description": "Custom printed Unisex Ultra Cotton Long Sleeve Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 80,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_81",
@@ -12656,7 +13537,40 @@
       "description": "Custom printed Kids Softstyle Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 81,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     },
     {
       "id": "printify_bp_88",
@@ -12667,7 +13581,40 @@
       "description": "Custom printed Women's Softstyle Tee by Gildan. Upload your design and we'll print and ship it for you.",
       "source": "printify",
       "blueprintId": 88,
-      "brand": "Gildan"
+      "brand": "Gildan",
+      "options": [
+        {
+          "name": "Size",
+          "values": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "2XL",
+            "3XL"
+          ]
+        },
+        {
+          "name": "Color",
+          "values": [
+            "Black",
+            "White",
+            "Navy",
+            "Dark Heather",
+            "Red",
+            "Royal Blue",
+            "Forest Green",
+            "Maroon",
+            "Gold",
+            "Orange"
+          ]
+        }
+      ],
+      "printArea": {
+        "w": 12,
+        "h": 16
+      }
     }
   ]
 }
