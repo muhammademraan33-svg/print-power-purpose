@@ -62,6 +62,8 @@ interface Interaction {
 
 export interface FinalizeResult {
   dataUrl: string
+  /** High-res PNG for the back side (present only when a back-side design exists). */
+  backDataUrl?: string
   pass: boolean
   errors: string[]
   warnings: string[]
@@ -185,6 +187,10 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
   const [editingId, setEditId]    = useState<string | null>(null)
   const [textInput, setTextInput] = useState('')
 
+  // Front / Back sides — savedSidesRef stores the inactive side's elements
+  const [activeSide, setActiveSide] = useState<'front' | 'back'>('front')
+  const savedSidesRef = useRef<{ front: DesignElement[]; back: DesignElement[] }>({ front: [], back: [] })
+
   // Stable design session ID (used by backend finalize endpoint)
   const designIdRef = useRef(uid())
 
@@ -253,6 +259,23 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
     setSelId(null); setEditId(null)
     setHistState({ idx: histIdxRef.current, len: histRef.current.length })
   }, [])
+
+  // ── Front / Back side switch ───────────────────────────────────────────────
+  const switchSide = useCallback((side: 'front' | 'back') => {
+    if (side === activeSide) return
+    // Persist current side's elements
+    savedSidesRef.current[activeSide] = elRef.current.map(e => ({ ...e }))
+    // Restore the target side's elements (empty array on first visit)
+    const next = savedSidesRef.current[side].map(e => ({ ...e }))
+    setElements(next)
+    setSelId(null)
+    setEditId(null)
+    setActiveSide(side)
+    // Reset history for the new side
+    histRef.current    = [next]
+    histIdxRef.current = 0
+    setHistState({ idx: 0, len: 1 })
+  }, [activeSide])
 
   // ── DRAW ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -528,11 +551,36 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
         if (el.id !== ia.id) return el
 
         if (ia.action === 'drag') {
-          // CLAMP: element must stay fully within canvas [0, 1]
+          const newX = ia.startXPct + dx
+          const newY = ia.startYPct + dy
+
+          if (el.type === 'image') {
+            // Images must keep covering the trim area — no white gap at the print boundary
+            const g       = guides(cszR.current, ssR.current)
+            const bxPct   = g.bx / w
+            const byPct   = g.by / h
+            const trimRPct = (w - g.bx) / w
+            const trimBPct = (h - g.by) / h
+            const trimWPct = trimRPct - bxPct
+            const trimHPct = trimBPct - byPct
+
+            const minX = el.wPct >= trimWPct ? trimRPct - el.wPct : 0
+            const maxX = el.wPct >= trimWPct ? bxPct               : 1 - el.wPct
+            const minY = el.hPct >= trimHPct ? trimBPct - el.hPct  : 0
+            const maxY = el.hPct >= trimHPct ? byPct                : 1 - el.hPct
+
+            return {
+              ...el,
+              xPct: Math.max(minX, Math.min(maxX, newX)),
+              yPct: Math.max(minY, Math.min(maxY, newY)),
+            }
+          }
+
+          // Text: clamp within full canvas
           return {
             ...el,
-            xPct: Math.max(0, Math.min(1 - el.wPct, ia.startXPct + dx)),
-            yPct: Math.max(0, Math.min(1 - el.hPct, ia.startYPct + dy)),
+            xPct: Math.max(0, Math.min(1 - el.wPct, newX)),
+            yPct: Math.max(0, Math.min(1 - el.hPct, newY)),
           }
         }
 
@@ -688,14 +736,36 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
       img.onload = () => {
         const { w, h } = cszR.current
         const ir = img.naturalWidth / img.naturalHeight
-        const cr = w / h
-        let wp: number, hp: number
-        if (ir > cr) { wp = 0.90; hp = wp * cr / ir }
-        else         { hp = 0.90; wp = hp * ir / cr }
+
+        // Cover the trim area so no white gap appears at the print boundary
+        const g = guides(cszR.current, ssR.current)
+        const trimW = w - 2 * g.bx
+        const trimH = h - 2 * g.by
+        const tr    = trimW / trimH
+
+        let imgW: number, imgH: number
+        if (ir >= tr) {
+          // Image wider than trim area — scale by trim height to fill vertically
+          imgH = trimH
+          imgW = imgH * ir
+        } else {
+          // Image taller than trim area — scale by trim width to fill horizontally
+          imgW = trimW
+          imgH = imgW / ir
+        }
+
+        // Center over the trim area (image may extend slightly into bleed — correct for print)
+        let xPx = g.bx + (trimW - imgW) / 2
+        let yPx = g.by + (trimH - imgH) / 2
+
+        // Clamp within canvas so nothing overflows the visible area
+        xPx = Math.max(0, Math.min(w - imgW, xPx))
+        yPx = Math.max(0, Math.min(h - imgH, yPx))
+
         const id = uid()
         const el: DesignElement = {
           id, type: 'image',
-          xPct: (1 - wp) / 2, yPct: (1 - hp) / 2, wPct: wp, hPct: hp,
+          xPct: xPx / w, yPct: yPx / h, wPct: imgW / w, hPct: imgH / h,
           src, imgEl: img, naturalRatio: ir,
         }
         setElements(prev => [...prev.filter(e => e.type !== 'image'), el])
@@ -792,13 +862,41 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
     onDesignExport(dataUrl)
     setSelId(prevSel)
 
-    return { dataUrl, pass: true, errors: [], warnings: pfResult.warnings, preflightHash, designId }
-  }, [draw, commitEdit, onDesignExport, runPreflight])
+    // If a back-side design exists, render it too
+    let backDataUrl: string | undefined
+    const backEls = activeSide === 'front'
+      ? savedSidesRef.current.back
+      : savedSidesRef.current.front
+    if (backEls.length > 0) {
+      const offBack = document.createElement('canvas')
+      offBack.width = expW; offBack.height = expH
+      const bctx = offBack.getContext('2d')!
+      bctx.fillStyle = '#ffffff'; bctx.fillRect(0, 0, expW, expH)
+      for (const el of backEls) {
+        const ex = el.xPct * w * sx, ey = el.yPct * h * sy
+        const ew = el.wPct * w * sx, eh = el.hPct * h * sy
+        if (el.type === 'image' && el.imgEl) {
+          bctx.drawImage(el.imgEl, ex, ey, ew, eh)
+        } else if (el.type === 'text' && el.text) {
+          const fs = Math.round((el.fontSizePct ?? DEF_FSZ) * h * sy)
+          bctx.font = `${el.italic ? 'italic ' : ''}${el.bold ? 'bold ' : ''}${fs}px ${el.fontFamily || 'Arial, sans-serif'}`
+          bctx.fillStyle = el.color || '#1a1a2e'; bctx.textBaseline = 'top'
+          wrapText(bctx, el.text, ex + 2, ey + 3, ew - 4, fs * 1.35)
+        }
+      }
+      backDataUrl = offBack.toDataURL('image/png')
+    }
+
+    return { dataUrl, backDataUrl, pass: true, errors: [], warnings: pfResult.warnings, preflightHash, designId }
+  }, [draw, commitEdit, onDesignExport, runPreflight, activeSide])
 
   // Expose finalize + hasContent to parent via ref
   useImperativeHandle(ref, () => ({
     finalize,
-    hasContent: () => elRef.current.length > 0,
+    hasContent: () =>
+      elRef.current.length > 0 ||
+      savedSidesRef.current.front.length > 0 ||
+      savedSidesRef.current.back.length  > 0,
   }), [finalize])
 
   // ── Drag-and-drop onto canvas ─────────────────────────────────────────────
@@ -834,7 +932,15 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
         <div className="flex items-center gap-2 min-w-0">
           <Layers className="w-4 h-4 text-primary shrink-0" />
           <div className="min-w-0">
-            <h3 className="font-semibold text-sm leading-tight">Design Editor</h3>
+            <h3 className="font-semibold text-sm leading-tight">
+              Design Editor
+              <span className={`ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full
+                ${activeSide === 'front'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-slate-200 text-slate-600'}`}>
+                {activeSide === 'front' ? 'Front' : 'Back'}
+              </span>
+            </h3>
             {selectedSize && parsed ? (
               <p className="text-[11px] text-muted-foreground">
                 {parsed.w}" × {parsed.h}" + 0.125" bleed · 300 DPI print file
@@ -892,6 +998,35 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
       {/* ── Tool bar ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-2
                       border-b border-border/20 bg-white">
+
+        {/* Front / Back side toggle */}
+        <div className="flex items-center rounded-lg border border-border/60 overflow-hidden shrink-0">
+          <button
+            onClick={() => switchSide('front')}
+            className={`px-3 h-8 text-xs font-semibold transition-colors ${
+              activeSide === 'front'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-white text-foreground/70 hover:bg-muted/60'
+            }`}
+          >
+            ▣ Front
+          </button>
+          <button
+            onClick={() => switchSide('back')}
+            className={`px-3 h-8 text-xs font-semibold border-l border-border/60 transition-colors ${
+              activeSide === 'back'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-white text-foreground/70 hover:bg-muted/60'
+            }`}
+          >
+            ▣ Back
+            {savedSidesRef.current.back.length > 0 && activeSide !== 'back' && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block align-middle" />
+            )}
+          </button>
+        </div>
+
+        <div className="w-px h-5 bg-border/50 shrink-0" />
 
         <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"
                 onClick={() => fileInputRef.current?.click()}>
@@ -1065,6 +1200,7 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
             <span>✏️ <b>Double-tap/click</b> text to edit</span>
             <span>📱 <b>Touch-friendly</b></span>
             <span><span className="text-red-500">✕</span> to delete</span>
+            <span>▣ <b>Front / Back</b> to switch sides</span>
           </p>
         </div>
       )}

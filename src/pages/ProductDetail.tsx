@@ -461,6 +461,7 @@ export default function ProductDetail() {
                 selectedOptions={selectedOptions}
                 onOptionChange={(name, value) => setSelectedOptions(prev => ({ ...prev, [name]: value }))}
                 optionGroups={optionGroups ?? []}
+                printArea={localProduct.printArea}
               />
             ) : (
               /* ── SinaLite flat-print product ── */

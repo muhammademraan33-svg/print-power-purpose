@@ -30,19 +30,40 @@ interface Props {
   selectedOptions: Record<string, string>
   onOptionChange: (name: string, value: string) => void
   optionGroups: Array<{ name: string; values: string[] }>
+  /** Product's actual print area dimensions in inches (from product catalogue). */
+  printArea?: { w: number; h: number }
 }
 
-// Print area as fraction of product image dimensions (centered front print)
+// Default print area as fraction of product image dimensions (centred front print)
 // Standard garment front print area: roughly 40% wide, centred around 40% from top
-const PRINT_AREA = { left: 0.30, top: 0.28, width: 0.40, height: 0.38 }
+const DEFAULT_PRINT_AREA = { left: 0.30, top: 0.28, width: 0.40, height: 0.38 }
+
+// Typical garment body dimensions in inches (used to map product printArea → display fraction)
+const GARMENT_BODY_W_IN = 20   // ~20" wide for a typical tee in the mockup
+const GARMENT_BODY_H_IN = 28   // ~28" tall
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const ApparelDesigner = forwardRef<DesignerRef, Props>(
   function ApparelDesigner(
-    { productId: _pid, productImage, productName, category, onDesignExport, selectedOptions, onOptionChange, optionGroups },
+    { productId: _pid, productImage, productName, category, onDesignExport, selectedOptions, onOptionChange, optionGroups, printArea },
     ref,
   ) {
+    // Compute the print area overlay based on the product's actual print area when available
+    const PRINT_AREA = printArea
+      ? {
+          left:   (GARMENT_BODY_W_IN - printArea.w) / 2 / GARMENT_BODY_W_IN,
+          top:    0.28,
+          width:  printArea.w / GARMENT_BODY_W_IN,
+          height: printArea.h / GARMENT_BODY_H_IN,
+        }
+      : DEFAULT_PRINT_AREA
+
+    // Front / Back sides
+    const [activeSide, setActiveSide] = useState<'front' | 'back'>('front')
+    const [backDesignSrc, setBackDesignSrc] = useState<string | null>(null)
+    const [backDesignImg, setBackDesignImg] = useState<HTMLImageElement | null>(null)
+
     const [designSrc, setDesignSrc] = useState<string | null>(null)
     const [designImg, setDesignImg] = useState<HTMLImageElement | null>(null)
     const [scale, setScale]         = useState(1)     // 0.5 – 2 relative to print area width
@@ -66,19 +87,24 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
         const src = ev.target?.result as string
         const img = new Image()
         img.onload = () => {
-          setDesignImg(img)
-          setDesignSrc(src)
+          if (activeSide === 'back') {
+            setBackDesignImg(img)
+            setBackDesignSrc(src)
+          } else {
+            setDesignImg(img)
+            setDesignSrc(src)
+          }
           setScale(1)
           setOffset({ x: 0, y: 0 })
           onDesignExport(src)
-          toast('Design uploaded — drag to reposition', 'success')
+          toast(`${activeSide === 'back' ? 'Back' : 'Front'} design uploaded — drag to reposition`, 'success')
         }
         img.src = src
       }
       reader.readAsDataURL(file)
       // Reset input so same file can be re-uploaded
       e.target.value = ''
-    }, [onDesignExport])
+    }, [onDesignExport, activeSide])
 
     // ── Mouse drag ─────────────────────────────────────────────────────────────
     const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -131,21 +157,27 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
 
     // ── Delete design ──────────────────────────────────────────────────────────
     const clearDesign = () => {
-      setDesignSrc(null)
-      setDesignImg(null)
+      if (activeSide === 'back') {
+        setBackDesignSrc(null)
+        setBackDesignImg(null)
+      } else {
+        setDesignSrc(null)
+        setDesignImg(null)
+      }
       setScale(1)
       setOffset({ x: 0, y: 0 })
     }
 
     // ── Imperative handle ─────────────────────────────────────────────────────
     useImperativeHandle(ref, () => ({
-      hasContent: () => !!designSrc,
+      hasContent: () => !!designSrc || !!backDesignSrc,
 
       finalize: async (): Promise<FinalizeResult> => {
         const errors: string[] = []
         const warnings: string[] = []
 
-        if (!designSrc) {
+        const activeSrcForFinalize = activeSide === 'back' ? backDesignSrc : designSrc
+        if (!activeSrcForFinalize) {
           errors.push('No design uploaded. Please upload a design image.')
           return {
             dataUrl: '',
@@ -156,6 +188,9 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
             designId: String(_pid),
           }
         }
+
+        const designSrcForFinalize  = activeSrcForFinalize
+        const designImgForFinalize  = activeSide === 'back' ? backDesignImg : designImg
 
         // Check required options
         const requiredOptions = optionGroups.map(g => g.name)
@@ -169,9 +204,11 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
         }
 
         // Export design-only PNG at 300 DPI equivalent
-        // We export at 3600×4800 (12"×16" @ 300dpi for standard front print)
-        const EXPORT_W = 3600
-        const EXPORT_H = 4800
+        // Size based on actual print area (or default 12"×16") at 300 DPI
+        const paWin   = printArea?.w ?? 12
+        const paHin   = printArea?.h ?? 16
+        const EXPORT_W = Math.round(paWin * 300)
+        const EXPORT_H = Math.round(paHin * 300)
         const offscreen = document.createElement('canvas')
         offscreen.width  = EXPORT_W
         offscreen.height = EXPORT_H
@@ -180,7 +217,7 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
         // Transparent background (design file only — no garment background)
         ctx.clearRect(0, 0, EXPORT_W, EXPORT_H)
 
-        if (designImg) {
+        if (designImgForFinalize) {
           // Compute design dimensions relative to print area
           const previewEl = previewRef.current
           const previewW  = previewEl?.offsetWidth  || 400
@@ -189,7 +226,7 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
           const paH = previewH * PRINT_AREA.height
 
           const designDispW = paW * scale
-          const designDispH = (designImg.naturalHeight / designImg.naturalWidth) * designDispW
+          const designDispH = (designImgForFinalize.naturalHeight / designImgForFinalize.naturalWidth) * designDispW
 
           // Map to export canvas
           const scaleX = EXPORT_W / paW
@@ -200,11 +237,11 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
           const dw = designDispW * scaleX
           const dh = designDispH * scaleY
 
-          ctx.drawImage(designImg, cx - dw / 2, cy - dh / 2, dw, dh)
+          ctx.drawImage(designImgForFinalize, cx - dw / 2, cy - dh / 2, dw, dh)
         }
 
         const dataUrl = offscreen.toDataURL('image/png')
-        const hash    = btoa(designSrc.length + ':' + scale + ':' + JSON.stringify(offset)).slice(0, 32)
+        const hash    = btoa(designSrcForFinalize.length + ':' + scale + ':' + JSON.stringify(offset)).slice(0, 32)
 
         return {
           dataUrl,
@@ -215,7 +252,10 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
           designId: `apparel-${_pid}-${Date.now()}`,
         }
       },
-    }), [designSrc, designImg, scale, offset, _pid, selectedOptions, optionGroups])
+    }), [designSrc, backDesignSrc, designImg, backDesignImg, scale, offset, _pid, selectedOptions, optionGroups, activeSide, printArea, PRINT_AREA])
+
+    // Determine which design is active for display
+    const activeDesignSrc = activeSide === 'back' ? backDesignSrc : designSrc
 
     // ── Get print area background colour based on selected colour ─────────────
     const selectedColor = selectedOptions['Color'] || ''
@@ -229,39 +269,71 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
       <div className="rounded-2xl border border-border/50 bg-white shadow-sm overflow-hidden">
 
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between bg-gradient-to-r from-purple-50 to-indigo-50">
-          <div>
-            <h3 className="font-semibold text-sm text-gray-800">Customize Your Design</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Upload artwork · drag to reposition · scale with zoom buttons
-            </p>
+        <div className="px-4 py-3 border-b border-border/30 bg-gradient-to-r from-purple-50 to-indigo-50 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-sm text-gray-800">Customize Your Design</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Upload artwork · drag to reposition · scale with zoom buttons
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {activeDesignSrc && (
+                <>
+                  <button
+                    onClick={() => setScale(s => Math.min(2, s + 0.1))}
+                    className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-gray-100 transition-colors"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setScale(s => Math.max(0.3, s - 0.1))}
+                    className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-gray-100 transition-colors"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={clearDesign}
+                    className="w-8 h-8 rounded-lg border border-red-200 text-red-500 flex items-center justify-center hover:bg-red-50 transition-colors"
+                    title="Remove design"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {designSrc && (
-              <>
-                <button
-                  onClick={() => setScale(s => Math.min(2, s + 0.1))}
-                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-gray-100 transition-colors"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setScale(s => Math.max(0.3, s - 0.1))}
-                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-gray-100 transition-colors"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={clearDesign}
-                  className="w-8 h-8 rounded-lg border border-red-200 text-red-500 flex items-center justify-center hover:bg-red-50 transition-colors"
-                  title="Remove design"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
+
+          {/* Front / Back toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium">Side:</span>
+            <div className="flex items-center rounded-lg border border-purple-200 overflow-hidden">
+              <button
+                onClick={() => { setActiveSide('front'); setScale(1); setOffset({ x: 0, y: 0 }) }}
+                className={`px-4 h-7 text-xs font-semibold transition-colors ${
+                  activeSide === 'front'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-purple-50'
+                }`}
+              >
+                ▣ Front
+              </button>
+              <button
+                onClick={() => { setActiveSide('back'); setScale(1); setOffset({ x: 0, y: 0 }) }}
+                className={`px-4 h-7 text-xs font-semibold border-l border-purple-200 transition-colors ${
+                  activeSide === 'back'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-purple-50'
+                }`}
+              >
+                ▣ Back
+                {backDesignSrc && activeSide !== 'back' && (
+                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block align-middle" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -298,21 +370,21 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
               top:    `${PRINT_AREA.top    * 100}%`,
               width:  `${PRINT_AREA.width  * 100}%`,
               height: `${PRINT_AREA.height * 100}%`,
-              borderColor: designSrc ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.35)',
+              borderColor: activeDesignSrc ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.35)',
             }}
           >
-            {!designSrc && (
+            {!activeDesignSrc && (
               <span
                 className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-center px-2 leading-snug"
                 style={{ color: overlayTextColor || 'rgba(99,102,241,0.7)' }}
               >
-                Print Area
+                {activeSide === 'back' ? 'Back Print Area' : 'Print Area'}
               </span>
             )}
           </div>
 
           {/* Design overlay */}
-          {designSrc && previewRef.current && (
+          {activeDesignSrc && previewRef.current && (
             <div
               className="absolute pointer-events-none"
               style={{
@@ -324,11 +396,10 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
               }}
             >
               <img
-                src={designSrc}
+                src={activeDesignSrc}
                 alt="Your design"
                 className="absolute"
                 style={{
-                  // Centre the design in the print area then apply scale + offset
                   left:      '50%',
                   top:       '50%',
                   width:     `${scale * 100}%`,
@@ -342,15 +413,15 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
           )}
 
           {/* Drag hint */}
-          {designSrc && !isDragging && (
+          {activeDesignSrc && !isDragging && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5
                             bg-black/60 text-white text-[10px] rounded-full px-2.5 py-1 pointer-events-none">
               <Move className="w-3 h-3" /> Drag to reposition
             </div>
           )}
 
-          {/* Upload area (when no design) */}
-          {!designSrc && (
+          {/* Upload area (when no design for active side) */}
+          {!activeDesignSrc && (
             <div
               className="absolute inset-0 flex flex-col items-center justify-end pb-6 gap-2
                           cursor-pointer group"
@@ -360,7 +431,9 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
                               border-2 border-dashed border-primary/40 group-hover:border-primary/70
                               rounded-2xl px-6 py-4 transition-all shadow-sm group-hover:shadow-md">
                 <Upload className="w-6 h-6 text-primary/60 group-hover:text-primary" />
-                <span className="text-sm font-semibold text-gray-700">Upload Your Design</span>
+                <span className="text-sm font-semibold text-gray-700">
+                  Upload {activeSide === 'back' ? 'Back' : 'Front'} Design
+                </span>
                 <span className="text-xs text-muted-foreground">PNG, JPG, SVG — transparent background recommended</span>
               </div>
             </div>
@@ -436,17 +509,20 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
 
         {/* Status bar */}
         <div className={`px-4 py-2.5 border-t text-xs flex items-center gap-2 ${
-          designSrc ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-gray-50 border-border/30 text-muted-foreground'
+          activeDesignSrc ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-gray-50 border-border/30 text-muted-foreground'
         }`}>
-          {designSrc ? (
+          {activeDesignSrc ? (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              Design applied · Zoom {Math.round(scale * 100)}% · {category} print-on-demand via Printify
+              {activeSide === 'back' ? 'Back' : 'Front'} design applied · Zoom {Math.round(scale * 100)}% · {category} print-on-demand via Printify
+              {backDesignSrc && designSrc && (
+                <span className="ml-1 font-medium text-emerald-600">(Both sides designed)</span>
+              )}
             </>
           ) : (
             <>
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-              Upload a design to customise this {category.toLowerCase().replace(/s$/, '')}
+              Upload a {activeSide} design to customise this {category.toLowerCase().replace(/s$/, '')}
             </>
           )}
         </div>
