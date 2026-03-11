@@ -743,29 +743,44 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
         const trimH = h - 2 * g.by
         const tr    = trimW / trimH
 
+        // Use Math.ceil so the image is always a whole pixel larger than the trim area —
+        // this eliminates the sub-pixel gap that shows as a white hairline along the trim line.
         let imgW: number, imgH: number
         if (ir >= tr) {
-          // Image wider than trim area — scale by trim height to fill vertically
           imgH = trimH
-          imgW = imgH * ir
+          imgW = Math.ceil(imgH * ir)
         } else {
-          // Image taller than trim area — scale by trim width to fill horizontally
           imgW = trimW
-          imgH = imgW / ir
+          imgH = Math.ceil(imgW / ir)
         }
 
-        // Center over the trim area (image may extend slightly into bleed — correct for print)
-        let xPx = g.bx + (trimW - imgW) / 2
-        let yPx = g.by + (trimH - imgH) / 2
+        // Center over the trim area (integer-rounded so positions snap to whole pixels)
+        const rawX = Math.round(g.bx + (trimW - imgW) / 2)
+        const rawY = Math.round(g.by + (trimH - imgH) / 2)
 
-        // Clamp within canvas so nothing overflows the visible area
-        xPx = Math.max(0, Math.min(w - imgW, xPx))
-        yPx = Math.max(0, Math.min(h - imgH, yPx))
+        // Apply the SAME constraint used during drag so the initial placement
+        // is already within bounds — no "jump" on first touch/drag.
+        const bxPct    = g.bx / w
+        const byPct    = g.by / h
+        const trimRPct = (w - g.bx) / w
+        const trimBPct = (h - g.by) / h
+        const wPct     = imgW / w
+        const hPct     = imgH / h
+        const trimWPct = trimRPct - bxPct
+        const trimHPct = trimBPct - byPct
+
+        const minX = wPct >= trimWPct ? trimRPct - wPct : 0
+        const maxX = wPct >= trimWPct ? bxPct            : 1 - wPct
+        const minY = hPct >= trimHPct ? trimBPct - hPct  : 0
+        const maxY = hPct >= trimHPct ? byPct             : 1 - hPct
+
+        const xPct = Math.max(minX, Math.min(maxX, rawX / w))
+        const yPct = Math.max(minY, Math.min(maxY, rawY / h))
 
         const id = uid()
         const el: DesignElement = {
           id, type: 'image',
-          xPct: xPx / w, yPct: yPx / h, wPct: imgW / w, hPct: imgH / h,
+          xPct, yPct, wPct, hPct,
           src, imgEl: img, naturalRatio: ir,
         }
         setElements(prev => [...prev.filter(e => e.type !== 'image'), el])
