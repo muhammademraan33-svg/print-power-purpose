@@ -19,15 +19,28 @@ export default function Causes() {
   const [searchQuery, setSearchQuery]     = useState('')
   const [selectedCauseId, setSelectedCauseId] = useState<string | null>(selectedCause?.id || null)
 
-  // Fetch causes
-  const { data: causes, isLoading: causesLoading } = useQuery({
+  // Default causes when Supabase is empty or unavailable
+  const DEFAULT_CAUSES: Cause[] = [
+    { id: 'education', name: 'Education', summary: 'Support schools, scholarships, and literacy programs.', icon: '📚', raised_cents: 0, created_at: new Date().toISOString() },
+    { id: 'health', name: 'Health & Wellness', summary: 'Fund medical research, mental health, and community wellness.', icon: '🏥', raised_cents: 0, created_at: new Date().toISOString() },
+    { id: 'environment', name: 'Environment', summary: 'Protect wildlife, clean oceans, and combat climate change.', icon: '🌍', raised_cents: 0, created_at: new Date().toISOString() },
+    { id: 'community', name: 'Community', summary: 'Help homeless, food banks, and local outreach programs.', icon: '🤝', raised_cents: 0, created_at: new Date().toISOString() },
+    { id: 'animals', name: 'Animals', summary: 'Support shelters, rescue groups, and animal welfare.', icon: '🐾', raised_cents: 0, created_at: new Date().toISOString() },
+  ]
+
+  const { data: causesData, isLoading: causesLoading } = useQuery({
     queryKey: ['causes'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('causes').select('*').order('name')
-      if (error) throw error
-      return data as Cause[]
+      try {
+        const { data, error } = await supabase.from('causes').select('*').order('name')
+        if (error) throw error
+        return (data?.length ? data : DEFAULT_CAUSES) as Cause[]
+      } catch {
+        return DEFAULT_CAUSES
+      }
     },
   })
+  const causes = causesData ?? DEFAULT_CAUSES
 
   // Search nonprofits
   const { data: nonprofits, isLoading: nonprofitsLoading } = useQuery({

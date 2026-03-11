@@ -35,12 +35,17 @@ interface Props {
 }
 
 // Default print area as fraction of product image dimensions (centred front print)
-// Standard garment front print area: roughly 40% wide, centred around 40% from top
-const DEFAULT_PRINT_AREA = { left: 0.30, top: 0.28, width: 0.40, height: 0.38 }
+// Width kept narrow so the dashed box stays within the visible shirt body in mockup photos
+const DEFAULT_PRINT_AREA = { left: 0.36, top: 0.28, width: 0.28, height: 0.38 }
 
 // Typical garment body dimensions in inches (used to map product printArea → display fraction)
 const GARMENT_BODY_W_IN = 20   // ~20" wide for a typical tee in the mockup
 const GARMENT_BODY_H_IN = 28   // ~28" tall
+// Scale down displayed width so dashed box matches shirt width in mockup (not full garment width)
+const PRINT_AREA_WIDTH_SCALE = 0.64
+
+// Margin (fraction) from print area edge to treat as "border" for dragging the box
+const PRINT_BOX_DRAG_MARGIN = 0.02
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -49,15 +54,35 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
     { productId: _pid, productImage, productName, category, onDesignExport, selectedOptions, onOptionChange, optionGroups, printArea },
     ref,
   ) {
-    // Compute the print area overlay based on the product's actual print area when available
+    // Compute the print area overlay: width scaled to fit shirt/mockup; height from print specs
     const PRINT_AREA = printArea
-      ? {
-          left:   (GARMENT_BODY_W_IN - printArea.w) / 2 / GARMENT_BODY_W_IN,
-          top:    0.28,
-          width:  printArea.w / GARMENT_BODY_W_IN,
-          height: printArea.h / GARMENT_BODY_H_IN,
-        }
+      ? (() => {
+          const rawWidth = printArea.w / GARMENT_BODY_W_IN
+          const width = Math.min(rawWidth * PRINT_AREA_WIDTH_SCALE, 0.34)
+          const left = (1 - width) / 2
+          return {
+            left,
+            top: 0.28,
+            width,
+            height: printArea.h / GARMENT_BODY_H_IN,
+          }
+        })()
       : DEFAULT_PRINT_AREA
+
+    const [printAreaOffset, setPrintAreaOffset] = useState({ x: 0, y: 0 }) // fraction; moves the whole print box
+    const [isDraggingBox, setIsDraggingBox] = useState(false)
+    const dragStartBox = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null)
+
+    const displayPrintArea = {
+      left:   PRINT_AREA.left + printAreaOffset.x,
+      top:    PRINT_AREA.top + printAreaOffset.y,
+      width:  PRINT_AREA.width,
+      height: PRINT_AREA.height,
+    }
+    const clampPrintAreaOffset = useCallback((x: number, y: number) => ({
+      x: Math.max(-PRINT_AREA.left, Math.min(1 - PRINT_AREA.left - PRINT_AREA.width, x)),
+      y: Math.max(-PRINT_AREA.top, Math.min(1 - PRINT_AREA.top - PRINT_AREA.height, y)),
+    }), [PRINT_AREA.left, PRINT_AREA.top, PRINT_AREA.width, PRINT_AREA.height])
 
     // Front / Back sides
     const [activeSide, setActiveSide] = useState<'front' | 'back'>('front')
@@ -106,54 +131,154 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
       e.target.value = ''
     }, [onDesignExport, activeSide])
 
+    // ── Hit test: is (xfrac,yfrac) in the print box border zone (for dragging the box)?
+    const isInPrintBoxBorder = useCallback((xfrac: number, yfrac: number) => {
+      const m = PRINT_BOX_DRAG_MARGIN
+      const L = displayPrintArea.left
+      const T = displayPrintArea.top
+      const W = displayPrintArea.width
+      const H = displayPrintArea.height
+      const inOuter = xfrac >= L - m && xfrac <= L + W + m && yfrac >= T - m && yfrac <= T + H + m
+      const inInner = xfrac >= L + m && xfrac <= L + W - m && yfrac >= T + m && yfrac <= T + H - m
+      return inOuter && !inInner
+    }, [displayPrintArea.left, displayPrintArea.top, displayPrintArea.width, displayPrintArea.height])
+
+    const isInsidePrintBox = useCallback((xfrac: number, yfrac: number) => {
+      const L = displayPrintArea.left
+      const T = displayPrintArea.top
+      const W = displayPrintArea.width
+      const H = displayPrintArea.height
+      return xfrac >= L && xfrac <= L + W && yfrac >= T && yfrac <= T + H
+    }, [displayPrintArea.left, displayPrintArea.top, displayPrintArea.width, displayPrintArea.height])
+
     // ── Mouse drag ─────────────────────────────────────────────────────────────
     const onMouseDown = useCallback((e: React.MouseEvent) => {
-      if (!designSrc) return
       e.preventDefault()
-      setIsDragging(true)
-      dragStart.current = { mx: e.clientX, my: e.clientY, ox: offset.x, oy: offset.y }
-    }, [designSrc, offset])
+      const el = previewRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const xfrac = (e.clientX - rect.left) / rect.width
+      const yfrac = (e.clientY - rect.top) / rect.height
+      if (isInPrintBoxBorder(xfrac, yfrac) || (isInsidePrintBox(xfrac, yfrac) && !designSrc)) {
+        setIsDraggingBox(true)
+        dragStartBox.current = { mx: e.clientX, my: e.clientY, ox: printAreaOffset.x, oy: printAreaOffset.y }
+        return
+      }
+      if (isInsidePrintBox(xfrac, yfrac) && designSrc) {
+        setIsDragging(true)
+        dragStart.current = { mx: e.clientX, my: e.clientY, ox: offset.x, oy: offset.y }
+      }
+    }, [designSrc, offset, printAreaOffset, isInPrintBoxBorder, isInsidePrintBox])
 
     useEffect(() => {
       const onMouseMove = (e: MouseEvent) => {
+        if (isDraggingBox && dragStartBox.current) {
+          const el = previewRef.current
+          if (!el) return
+          const rect = el.getBoundingClientRect()
+          const dxFrac = (e.clientX - dragStartBox.current.mx) / rect.width
+          const dyFrac = (e.clientY - dragStartBox.current.my) / rect.height
+          setPrintAreaOffset(clampPrintAreaOffset(
+            dragStartBox.current!.ox + dxFrac,
+            dragStartBox.current!.oy + dyFrac,
+          ))
+          return
+        }
         if (!isDragging || !dragStart.current) return
         const dx = e.clientX - dragStart.current.mx
         const dy = e.clientY - dragStart.current.my
-        setOffset({ x: dragStart.current.ox + dx, y: dragStart.current.oy + dy })
+        const next = { x: dragStart.current.ox + dx, y: dragStart.current.oy + dy }
+        setOffset(() => {
+          const el = previewRef.current
+          if (!el) return next
+          const w = el.offsetWidth, h = el.offsetHeight
+          const paW = w * displayPrintArea.width
+          const paH = h * displayPrintArea.height
+          const maxShift = Math.min(paW, paH) * 0.45
+          return {
+            x: Math.max(-maxShift, Math.min(maxShift, next.x)),
+            y: Math.max(-maxShift, Math.min(maxShift, next.y)),
+          }
+        })
       }
-      const onMouseUp = () => setIsDragging(false)
+      const onMouseUp = () => {
+        setIsDragging(false)
+        setIsDraggingBox(false)
+      }
       window.addEventListener('mousemove', onMouseMove)
       window.addEventListener('mouseup', onMouseUp)
       return () => {
         window.removeEventListener('mousemove', onMouseMove)
         window.removeEventListener('mouseup', onMouseUp)
       }
-    }, [isDragging])
+    }, [isDragging, isDraggingBox, displayPrintArea.width, displayPrintArea.height, clampPrintAreaOffset])
 
     // ── Touch drag ─────────────────────────────────────────────────────────────
     const onTouchStart = useCallback((e: React.TouchEvent) => {
-      if (!designSrc) return
       const t = e.touches[0]
-      setIsDragging(true)
-      dragStart.current = { mx: t.clientX, my: t.clientY, ox: offset.x, oy: offset.y }
-    }, [designSrc, offset])
+      const el = previewRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const xfrac = (t.clientX - rect.left) / rect.width
+      const yfrac = (t.clientY - rect.top) / rect.height
+      if (isInPrintBoxBorder(xfrac, yfrac) || (isInsidePrintBox(xfrac, yfrac) && !designSrc)) {
+        e.preventDefault()
+        setIsDraggingBox(true)
+        dragStartBox.current = { mx: t.clientX, my: t.clientY, ox: printAreaOffset.x, oy: printAreaOffset.y }
+        return
+      }
+      if (isInsidePrintBox(xfrac, yfrac) && designSrc) {
+        e.preventDefault()
+        setIsDragging(true)
+        dragStart.current = { mx: t.clientX, my: t.clientY, ox: offset.x, oy: offset.y }
+      }
+    }, [designSrc, offset, printAreaOffset, isInPrintBoxBorder, isInsidePrintBox])
 
     useEffect(() => {
       const onTouchMove = (e: TouchEvent) => {
-        if (!isDragging || !dragStart.current) return
         const t = e.touches[0]
-        const dx = t.clientX - dragStart.current.mx
-        const dy = t.clientY - dragStart.current.my
-        setOffset({ x: dragStart.current.ox + dx, y: dragStart.current.oy + dy })
+        if (isDraggingBox && dragStartBox.current && t) {
+          const el = previewRef.current
+          if (!el) return
+          const rect = el.getBoundingClientRect()
+          const dxFrac = (t.clientX - dragStartBox.current.mx) / rect.width
+          const dyFrac = (t.clientY - dragStartBox.current.my) / rect.height
+          setPrintAreaOffset(clampPrintAreaOffset(
+            dragStartBox.current.ox + dxFrac,
+            dragStartBox.current.oy + dyFrac,
+          ))
+          return
+        }
+        if (!isDragging || !dragStart.current) return
+        const touch = e.touches[0]
+        if (!touch) return
+        const dx = touch.clientX - dragStart.current.mx
+        const dy = touch.clientY - dragStart.current.my
+        const next = { x: dragStart.current.ox + dx, y: dragStart.current.oy + dy }
+        setOffset(() => {
+          const el = previewRef.current
+          if (!el) return next
+          const w = el.offsetWidth, h = el.offsetHeight
+          const paW = w * displayPrintArea.width
+          const paH = h * displayPrintArea.height
+          const maxShift = Math.min(paW, paH) * 0.45
+          return {
+            x: Math.max(-maxShift, Math.min(maxShift, next.x)),
+            y: Math.max(-maxShift, Math.min(maxShift, next.y)),
+          }
+        })
       }
-      const onTouchEnd = () => setIsDragging(false)
+      const onTouchEnd = () => {
+        setIsDragging(false)
+        setIsDraggingBox(false)
+      }
       window.addEventListener('touchmove', onTouchMove, { passive: false })
       window.addEventListener('touchend', onTouchEnd)
       return () => {
         window.removeEventListener('touchmove', onTouchMove)
         window.removeEventListener('touchend', onTouchEnd)
       }
-    }, [isDragging])
+    }, [isDragging, isDraggingBox, displayPrintArea.width, displayPrintArea.height, clampPrintAreaOffset])
 
     // ── Delete design ──────────────────────────────────────────────────────────
     const clearDesign = () => {
@@ -274,7 +399,7 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
             <div>
               <h3 className="font-semibold text-sm text-gray-800">Customize Your Design</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Upload artwork · drag to reposition · scale with zoom buttons
+                Upload artwork · drag design to reposition · drag print box to move area · zoom to scale
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -362,15 +487,17 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
             </div>
           )}
 
-          {/* Print area indicator */}
+          {/* Print area indicator (position uses displayPrintArea so it can be dragged) */}
           <div
-            className="absolute rounded border-2 border-dashed pointer-events-none transition-colors"
+            className="absolute rounded border-2 border-dashed transition-colors"
             style={{
-              left:   `${PRINT_AREA.left   * 100}%`,
-              top:    `${PRINT_AREA.top    * 100}%`,
-              width:  `${PRINT_AREA.width  * 100}%`,
-              height: `${PRINT_AREA.height * 100}%`,
+              left:   `${displayPrintArea.left   * 100}%`,
+              top:    `${displayPrintArea.top    * 100}%`,
+              width:  `${displayPrintArea.width  * 100}%`,
+              height: `${displayPrintArea.height * 100}%`,
               borderColor: activeDesignSrc ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.35)',
+              cursor: isDraggingBox ? 'grabbing' : 'grab',
+              pointerEvents: 'auto',
             }}
           >
             {!activeDesignSrc && (
@@ -383,16 +510,15 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
             )}
           </div>
 
-          {/* Design overlay */}
+          {/* Design overlay — overflow hidden so design stays inside print area */}
           {activeDesignSrc && previewRef.current && (
             <div
-              className="absolute pointer-events-none"
+              className="absolute overflow-hidden rounded-sm pointer-events-none"
               style={{
-                left:      `${PRINT_AREA.left   * 100}%`,
-                top:       `${PRINT_AREA.top    * 100}%`,
-                width:     `${PRINT_AREA.width  * 100}%`,
-                height:    `${PRINT_AREA.height * 100}%`,
-                overflow:  'visible',
+                left:      `${displayPrintArea.left   * 100}%`,
+                top:       `${displayPrintArea.top    * 100}%`,
+                width:     `${displayPrintArea.width  * 100}%`,
+                height:    `${displayPrintArea.height * 100}%`,
               }}
             >
               <img
@@ -485,22 +611,18 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
                     })}
                   </div>
                 ) : (
-                  /* Size pills */
-                  <div className="flex flex-wrap gap-2">
+                  /* Size and other options — use dropdown */
+                  <select
+                    value={selectedOptions[group.name] || ''}
+                    onChange={(e) => onOptionChange(group.name, e.target.value)}
+                    className="w-full max-w-[200px] h-10 px-4 rounded-lg border border-border bg-background
+                               text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">Select {group.name}…</option>
                     {group.values.map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => onOptionChange(group.name, val)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                          selectedOptions[group.name] === val
-                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                            : 'bg-background border-border text-foreground/80 hover:border-primary/50'
-                        }`}
-                      >
-                        {val}
-                      </button>
+                      <option key={val} value={val}>{val}</option>
                     ))}
-                  </div>
+                  </select>
                 )}
               </div>
             ))}

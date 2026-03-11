@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "sync:products": "node scripts/sync-products.mjs",
-    "sync:products:with-printify": "cross-env PRINTIFY_API_KEY=$npm_config_printify_key node scripts/sync-products.mjs"
+    "sync:products:with-printify": "cross-env PRINTIFY_API_KEY=$npm_config_printify_key node scripts/sync-products.mjs",
+    "refresh:printify-images": "node scripts/refresh-printify-images.mjs",
+    "add:prices": "node scripts/add-base-prices.mjs"
   },
   "overrides": {
     "minimatch": "^10.0.0"

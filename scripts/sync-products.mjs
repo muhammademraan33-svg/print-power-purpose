@@ -153,27 +153,31 @@ async function getSinaLiteProductOptions(token, productId) {
     })
     if (!res.ok) return []
     const data = await res.json()
-    // API can return [[...]] or [...]
     const flat = Array.isArray(data[0]) ? data[0] : (Array.isArray(data) ? data : [])
     const grouped = {}
+    const idMap = {}
     for (const opt of flat) {
       if (!opt.group || opt.hidden) continue
-      if (!grouped[opt.group]) grouped[opt.group] = []
-      if (!grouped[opt.group].includes(opt.name)) grouped[opt.group].push(opt.name)
+      if (!grouped[opt.group]) { grouped[opt.group] = []; idMap[opt.group] = {} }
+      if (!grouped[opt.group].includes(opt.name)) {
+        grouped[opt.group].push(opt.name)
+        idMap[opt.group][opt.name] = opt.id
+      }
     }
-    return Object.entries(grouped).map(([name, values]) => ({ name, values }))
+    return Object.entries(grouped).map(([name, values]) => ({ name, values, optionIds: idMap[name] || {} }))
   } catch {
     return []
   }
 }
 
 // ── Popular blueprint IDs to include from Printify catalog ──────────────────
-// These are well-known popular apparel/accessory items
+// These are well-known popular apparel/accessory items (each gets its blueprint image from API)
 const POPULAR_BLUEPRINT_IDS = [
-  5,    // Next Level - Unisex Cotton Crew Tee
+  5,    // Next Level - Unisex Cotton Crew Tee (short sleeve)
   6,    // Gildan - Unisex Heavy Cotton Tee
   9,    // Bella+Canvas - Women's Favorite Tee
   12,   // Bella+Canvas - Unisex Jersey Short Sleeve Tee
+  45,   // Next Level - Men's Long Sleeve Crew Tee
   77,   // Gildan - Unisex Heavy Blend Crewneck Sweatshirt
   92,   // Bella+Canvas - Unisex Sponge Fleece Full-Zip Hoodie
   429,  // Bella+Canvas - Unisex Fleece Pullover Hoodie
@@ -247,7 +251,11 @@ async function main() {
         category: p.category,
         image: getImageForCategory(p.category),
         description: `Professional ${p.name} printing. High-quality results with fast turnaround.`,
-        options,   // ← stored so ProductDetail can read them without an API call
+        options,
+        optionIds: options.reduce((acc, g) => {
+          acc[g.name] = g.optionIds || {}
+          return acc
+        }, {}),
         source: 'sinalite',
       })
     }

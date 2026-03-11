@@ -15,6 +15,8 @@ import ProductDesigner, { type DesignerRef } from '@/components/product/ProductD
 import ApparelDesigner from '@/components/product/ApparelDesigner'
 import sinaliteData from '@/data/sinaliteProducts.json'
 import { supabaseAdmin } from '@/services/supabase'
+import { sinalitePriceApi } from '@/services/sinalite-price'
+import { fetchPrintifyPrice } from '@/services/printify-price'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SinaliteOption       { id: number; group: string; name: string; hidden: number }
@@ -123,10 +125,53 @@ export default function ProductDetail() {
     ? (localOptions.length > 0 ? localOptions : [])
     : (localOptions.length > 0 ? localOptions : apiOptions)
 
+  const hasQtyOption = source === 'sinalite' && optionGroups?.some((g) => g.name === 'qty')
+  const qtyGroup = optionGroups?.find((g) => g.name === 'qty')
+  const effectiveQuantity = hasQtyOption
+    ? (() => {
+        const raw = selectedOptions['qty'] || qtyGroup?.values?.[0] || '1'
+        const n = parseInt(String(raw), 10)
+        return Number.isFinite(n) && n >= 1 ? n : 1
+      })()
+    : quantity
+
   const selectedSizeValue: string | undefined = (() => {
     const sizeKey = Object.keys(selectedOptions).find(k => k.toLowerCase().includes('size'))
     return sizeKey ? selectedOptions[sizeKey] : undefined
   })()
+
+  // Build SinaLite product option IDs for price API (use selected or first value per group)
+  const sinaliteProductOptions = (() => {
+    if (source !== 'sinalite' || !localProduct?.optionIds || !optionGroups?.length) return []
+    const optionIds = (localProduct as { optionIds?: Record<string, Record<string, number>> }).optionIds
+    return optionGroups.flatMap((g) => {
+      const value = selectedOptions[g.name] ?? g.values?.[0]
+      if (!value) return []
+      const id = optionIds?.[g.name]?.[value]
+      return typeof id === 'number' ? [id] : []
+    })
+  })()
+
+  // ── SinaLite price from API ─────────────────────────────────────────────
+  const { data: sinalitePriceData, isLoading: sinalitePriceLoading } = useQuery({
+    queryKey: ['sinalite-price', id, source, sinaliteProductOptions, effectiveQuantity],
+    queryFn: async () => {
+      const productId = typeof localProduct?.id === 'number' ? localProduct.id : parseInt(String(localProduct?.id), 10)
+      if (!Number.isFinite(productId) || sinaliteProductOptions.length === 0) return null
+      return sinalitePriceApi.calculatePrice(productId, sinaliteProductOptions, effectiveQuantity)
+    },
+    enabled: !!localProduct && source === 'sinalite' && sinaliteProductOptions.length > 0,
+    staleTime: 60_000,
+  })
+
+  // ── Printify price from API (blueprint cost + markup) ────────────────────
+  const blueprintId = source === 'printify' && localProduct ? (localProduct as { blueprintId?: number }).blueprintId : undefined
+  const { data: printifyPriceData, isLoading: printifyPriceLoading } = useQuery({
+    queryKey: ['printify-price', blueprintId],
+    queryFn: () => fetchPrintifyPrice(blueprintId!),
+    enabled: !!blueprintId && source === 'printify',
+    staleTime: 5 * 60_000,
+  })
 
   // ── Add to Cart: runs finalize preflight, uploads design, then adds item ───
   const handleAddToCart = async () => {
@@ -166,8 +211,8 @@ export default function ProductDetail() {
         id:            localProduct.id.toString(),
         productId:     typeof localProduct.id === 'number' ? localProduct.id : 0,
         name:          localProduct.name,
-        priceCents:    5000,
-        quantity,
+        priceCents:    unitPriceCents,
+        quantity:      effectiveQuantity,
         imageUrl:      localProduct.image || undefined,
         configuration: selectedOptions,
         artworkUrl:    uploadedUrl || undefined,
@@ -184,8 +229,8 @@ export default function ProductDetail() {
         id:           localProduct.id.toString(),
         productId:    typeof localProduct.id === 'number' ? localProduct.id : 0,
         name:         localProduct.name,
-        priceCents:   5000,
-        quantity,
+        priceCents:   unitPriceCents,
+        quantity:     effectiveQuantity,
         imageUrl:     localProduct.image || undefined,
         configuration: selectedOptions,
         artworkUrl:   artworkUrl || undefined,
@@ -210,7 +255,19 @@ export default function ProductDetail() {
     )
   }
 
-  const donationCents = calculateDonation(5000 * quantity)
+  const fallbackPriceCents = localProduct.basePriceCents ?? (localProduct as { priceCents?: number }).priceCents ?? 5000
+  const unitPriceCents = (() => {
+    if (source === 'sinalite' && sinalitePriceData?.price != null) {
+      const parsed = parseFloat(String(sinalitePriceData.price))
+      return Number.isFinite(parsed) ? Math.round(parsed * 100) : fallbackPriceCents
+    }
+    if (source === 'printify' && printifyPriceData?.priceCents != null) {
+      return printifyPriceData.priceCents
+    }
+    return fallbackPriceCents
+  })()
+  const donationCents = calculateDonation(unitPriceCents * effectiveQuantity)
+  const priceLoading = (source === 'sinalite' && sinalitePriceLoading) || (source === 'printify' && printifyPriceLoading)
 
   // ─── Reusable content blocks ──────────────────────────────────────────────
   const TitleBlock = (
@@ -231,6 +288,19 @@ export default function ProductDetail() {
       )}
     </div>
   )
+
+  const uploadRequirements = (() => {
+    const name = (localProduct?.name || '').toLowerCase()
+    const cat = (localProduct?.category || '').toLowerCase()
+    const reqs: string[] = []
+    if (name.includes('foil') || name.includes('spot uv') || name.includes('spot uv')) {
+      reqs.push('This product requires 2 files: design file + foil/spot UV layer.')
+    }
+    if (cat.includes('booklet')) {
+      reqs.push('PDF upload recommended for booklets.')
+    }
+    return reqs
+  })()
 
   const SpecsBlock = source === 'printify' ? (
     <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
@@ -258,6 +328,9 @@ export default function ProductDetail() {
             <li>• 0.125" bleed on all edges (built in to designer)</li>
             <li>• Keep text 0.25" from trim edge (inside safe area)</li>
             <li>• Designer generates print-ready file automatically</li>
+            {uploadRequirements.map((r, i) => (
+              <li key={i} className="font-medium text-amber-800">• {r}</li>
+            ))}
           </ul>
         </div>
       </div>
@@ -277,28 +350,44 @@ export default function ProductDetail() {
           {optionGroups.map((group) => (
             <div key={group.name}>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-semibold text-foreground">{group.name}</label>
+                <label className="text-sm font-semibold text-foreground">
+                  {group.name === 'qty' ? 'Quantity' : group.name}
+                </label>
                 {selectedOptions[group.name] && (
                   <span className="text-xs text-primary font-medium">
                     {selectedOptions[group.name]}
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {group.values.map((val) => (
-                  <button
-                    key={val}
-                    onClick={() => setSelectedOptions(prev => ({ ...prev, [group.name]: val }))}
-                    className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
-                      selectedOptions[group.name] === val
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-background border-border text-foreground/80 hover:border-primary/50'
-                    }`}
-                  >
-                    {val}
-                  </button>
-                ))}
-              </div>
+              {group.name === 'Color' ? (
+                <div className="flex flex-wrap gap-2">
+                  {group.values.map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setSelectedOptions(prev => ({ ...prev, [group.name]: val }))}
+                      className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
+                        selectedOptions[group.name] === val
+                          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                          : 'bg-background border-border text-foreground/80 hover:border-primary/50'
+                      }`}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <select
+                  value={selectedOptions[group.name] || ''}
+                  onChange={(e) => setSelectedOptions(prev => ({ ...prev, [group.name]: e.target.value }))}
+                  className="w-full max-w-xs h-10 px-4 rounded-lg border border-border bg-background text-sm font-medium
+                             focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="">Select {group.name === 'qty' ? 'Quantity' : group.name}…</option>
+                  {group.values.map((val) => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+              )}
             </div>
           ))}
         </div>
@@ -312,35 +401,39 @@ export default function ProductDetail() {
     <div className="bg-white rounded-2xl border border-border/50 p-4 sm:p-5 shadow-sm space-y-4">
       <h3 className="font-semibold text-base">Quantity & Pricing</h3>
 
-      {/* Qty stepper */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-muted-foreground w-20">Quantity</label>
-        <div className="flex items-center rounded-xl border border-border overflow-hidden">
-          <button
-            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-            className="w-10 h-10 flex items-center justify-center hover:bg-muted transition-colors border-r border-border"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <Input
-            type="number" min="1" value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-            className="w-16 text-center border-0 rounded-none h-10 focus-visible:ring-0 font-semibold"
-          />
-          <button
-            onClick={() => setQuantity(quantity + 1)}
-            className="w-10 h-10 flex items-center justify-center hover:bg-muted transition-colors border-l border-border"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+      {/* Qty stepper — only when there is no "qty" option in Product Options (e.g. Printify) */}
+      {!hasQtyOption && (
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-muted-foreground w-20">Quantity</label>
+          <div className="flex items-center rounded-xl border border-border overflow-hidden">
+            <button
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              className="w-10 h-10 flex items-center justify-center hover:bg-muted transition-colors border-r border-border"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <Input
+              type="number" min="1" value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-16 text-center border-0 rounded-none h-10 focus-visible:ring-0 font-semibold"
+            />
+            <button
+              onClick={() => setQuantity(quantity + 1)}
+              className="w-10 h-10 flex items-center justify-center hover:bg-muted transition-colors border-l border-border"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Price rows */}
       <div className="space-y-2 pt-3 border-t border-border/40">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Unit Price</span>
-          <span className="font-medium italic text-muted-foreground">Calculated at checkout</span>
+          <span className="font-semibold">
+            {priceLoading ? <span className="inline-flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</span> : formatPrice(unitPriceCents)}
+          </span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground flex items-center gap-1">
@@ -349,8 +442,8 @@ export default function ProductDetail() {
           <span className="font-semibold text-emerald-600">~{formatPrice(donationCents)}</span>
         </div>
         <div className="flex justify-between text-base font-bold pt-2 border-t border-border/40">
-          <span>Qty</span>
-          <span>× {quantity}</span>
+          <span>Subtotal</span>
+          <span>{priceLoading ? '…' : formatPrice(unitPriceCents * effectiveQuantity)}</span>
         </div>
       </div>
 
@@ -506,21 +599,23 @@ export default function ProductDetail() {
       <div className="fixed bottom-0 left-0 right-0 z-30 sm:hidden
                       bg-background/97 backdrop-blur-md border-t border-border shadow-2xl">
         <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center rounded-xl border border-border overflow-hidden shrink-0">
-            <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="w-9 h-10 flex items-center justify-center hover:bg-muted transition-colors border-r border-border"
-            >
-              <Minus className="w-3 h-3" />
-            </button>
-            <span className="w-10 text-center text-sm font-semibold">{quantity}</span>
-            <button
-              onClick={() => setQuantity(quantity + 1)}
-              className="w-9 h-10 flex items-center justify-center hover:bg-muted transition-colors border-l border-border"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
+          {!hasQtyOption && (
+            <div className="flex items-center rounded-xl border border-border overflow-hidden shrink-0">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-9 h-10 flex items-center justify-center hover:bg-muted transition-colors border-r border-border"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="w-10 text-center text-sm font-semibold">{quantity}</span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-9 h-10 flex items-center justify-center hover:bg-muted transition-colors border-l border-border"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          )}
           <Button
             size="lg"
             className="flex-1 h-12 font-semibold gap-2 shadow-lg shadow-primary/25

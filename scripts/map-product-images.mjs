@@ -191,6 +191,9 @@ const CAT_MAP = {
 let updated = 0, skuMapped = 0, catMapped = 0, noImage = 0
 
 data.products = data.products.map(p => {
+  // Never overwrite Printify product images — they come from Printify API per blueprint
+  if (p.source === 'printify') return p
+
   const trimSku = (p.sku || '').trim()
   let img = SKU_MAP[trimSku]
   if (img) {

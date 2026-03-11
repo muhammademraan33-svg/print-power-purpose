@@ -199,9 +199,10 @@ async function main() {
     if (!catImageMap[cat] && FALLBACKS[cat]) catImageMap[cat] = FALLBACKS[cat]
   }
 
-  // Update all products
+  // Update only SinaLite products — never overwrite Printify (they use Printify API images)
   let updated = 0
   data.products = data.products.map(p => {
+    if (p.source === 'printify') return p
     const img = catImageMap[p.category] || FALLBACKS[p.category] || null
     if (img !== p.image) updated++
     return { ...p, image: img }

@@ -97,6 +97,17 @@ const H          = 8     // handle square half-size (px)
 const DEF_FSZ    = 0.06  // default font = 6% of canvas height
 const EXPORT_DPI = 300
 const MAX_HIST   = 20
+const MIN_TEXT_HPCT = 0.04  // minimum text box height when resizing
+const FONT_OPTIONS = [
+  { value: '"Plus Jakarta Sans", Arial, sans-serif', label: 'Plus Jakarta Sans' },
+  { value: 'Arial, sans-serif', label: 'Arial' },
+  { value: 'Georgia, serif', label: 'Georgia' },
+  { value: '"Times New Roman", Times, serif', label: 'Times New Roman' },
+  { value: '"Helvetica Neue", Helvetica, sans-serif', label: 'Helvetica' },
+  { value: '"Courier New", monospace', label: 'Courier New' },
+  { value: 'Verdana, sans-serif', label: 'Verdana' },
+  { value: '"Trebuchet MS", sans-serif', label: 'Trebuchet MS' },
+]
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
@@ -324,8 +335,11 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
         ctx.drawImage(el.imgEl, ex, ey, ew, eh)
 
       } else if (el.type === 'text') {
-        const dispText = (el.id === editing ? liveText : el.text) || ''
+        const dispText = (el.id === editing ? liveText : el.text) ?? ''
+        const showPlaceholder = !dispText
+        const textToRender = showPlaceholder ? 'Your text here' : dispText
         const fs = Math.round((el.fontSizePct ?? DEF_FSZ) * h)
+        const lineHeight = fs * 1.2
 
         if (el.id === editing) {
           ctx.save()
@@ -334,12 +348,10 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
           ctx.strokeRect(ex, ey, ew, eh); ctx.setLineDash([])
           ctx.restore()
         }
-        if (dispText) {
-          ctx.font = `${el.italic ? 'italic ' : ''}${el.bold ? 'bold ' : ''}${fs}px ${el.fontFamily || '"Plus Jakarta Sans", Arial, sans-serif'}`
-          ctx.fillStyle = el.id === editing ? (el.color || '#1a1a2e') + '99' : (el.color || '#1a1a2e')
-          ctx.textBaseline = 'top'
-          wrapText(ctx, dispText, ex + 2, ey + 3, ew - 4, fs * 1.35)
-        }
+        ctx.font = `${el.italic ? 'italic ' : ''}${el.bold ? 'bold ' : ''}${fs}px ${el.fontFamily || '"Plus Jakarta Sans", Arial, sans-serif'}`
+        ctx.fillStyle = showPlaceholder ? 'rgba(100,116,139,0.4)' : (el.id === editing ? (el.color || '#1a1a2e') + '99' : (el.color || '#1a1a2e'))
+        ctx.textBaseline = 'top'
+        wrapText(ctx, textToRender, ex + 2, ey + 3, ew - 4, lineHeight)
       }
 
       // ── Selection + handles ─────────────────────────────────────────────
@@ -597,9 +609,10 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
           case 'resize-w':  xp += dx;    wp -= dx; break
         }
 
-        // Clamp minimum size
-        if (wp < MIN) { if (ia.action.includes('w')) xp = ia.startXPct + ia.startWPct - MIN; wp = MIN }
-        if (hp < MIN) { if (ia.action.includes('n')) yp = ia.startYPct + ia.startHPct - MIN; hp = MIN }
+        // Clamp minimum size (text needs larger minimum to stay readable)
+        const minSize = el.type === 'text' ? MIN_TEXT_HPCT : MIN
+        if (wp < minSize) { if (ia.action.includes('w')) xp = ia.startXPct + ia.startWPct - minSize; wp = minSize }
+        if (hp < minSize) { if (ia.action.includes('n')) yp = ia.startYPct + ia.startHPct - minSize; hp = minSize }
 
         // CLAMP: keep within canvas bounds
         xp = Math.max(0, xp)
@@ -607,13 +620,13 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
         wp = Math.min(wp, 1 - xp)
         hp = Math.min(hp, 1 - yp)
 
-        // For text: scale font size proportionally with box height
+        // For text: scale font size proportionally with box height (keep within readable range)
         if (el.type === 'text') {
           const oldHeightPx = ia.startHPct * h
           const newHeightPx = hp * h
           const scale = oldHeightPx > 0 ? newHeightPx / oldHeightPx : 1
           const oldFontSizePct = el.fontSizePct ?? DEF_FSZ
-          const newFontSizePct = Math.max(0.01, Math.min(0.3, oldFontSizePct * scale))
+          const newFontSizePct = Math.max(MIN_TEXT_HPCT, Math.min(0.25, oldFontSizePct * scale))
           return { ...el, xPct: xp, yPct: yp, wPct: wp, hPct: hp, fontSizePct: newFontSizePct }
         }
 
@@ -662,7 +675,7 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
   const onDblClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = toCanvas(e)
     const hit = hitEl(x, y)
-    if (hit?.type === 'text') { setEditId(hit.id); setTextInput(hit.text || ''); setSelId(hit.id) }
+    if (hit?.type === 'text') { setEditId(hit.id); setTextInput(hit.text ?? ''); setSelId(hit.id) }
   }
 
   // ── Touch events (mobile drag + resize support) ────────────────────────────
@@ -677,7 +690,7 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
       lastTapTimeRef.current = 0
       const hit = hitEl(x, y)
       if (hit?.type === 'text') {
-        setEditId(hit.id); setTextInput(hit.text || ''); setSelId(hit.id)
+        setEditId(hit.id); setTextInput(hit.text ?? ''); setSelId(hit.id)
       }
       return
     }
@@ -701,7 +714,7 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
   // ── Text editing ──────────────────────────────────────────────────────────
   const commitEdit = useCallback(() => {
     const id = editR.current; if (!id) return
-    const val = txtR.current.trim() || 'Your text here'
+    const val = txtR.current.trim()  // Keep empty if user clears — placeholder is display-only
     setElements(prev => prev.map(el => el.id === id ? { ...el, text: val } : el))
     setEditId(null)
     setTimeout(saveHistory, 0)
@@ -719,10 +732,11 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
     const id = uid()
     const el: DesignElement = {
       id, type: 'text', xPct: 0.12, yPct: 0.38, wPct: 0.76, hPct: 0.24,
-      text: 'Your text here', fontSizePct: DEF_FSZ, color: '#1a1a2e',
+      text: '', fontSizePct: DEF_FSZ, color: '#1a1a2e',
+      fontFamily: FONT_OPTIONS[0].value,
     }
     setElements(prev => [...prev, el])
-    setSelId(id); setEditId(id); setTextInput('Your text here')
+    setSelId(id); setEditId(id); setTextInput('')  // Empty — placeholder shown in UI
     setTimeout(saveHistory, 0)
   }, [saveHistory])
 
@@ -1052,19 +1066,19 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
           <Type className="w-3 h-3" /> Add Text
         </Button>
 
-        {/* Text controls */}
+        {/* Text controls: Bold, Italic, Color, Size, Font (dropdown), Edit — all shown when a text element is selected */}
         {isText && !editingId && (
           <>
-            <div className="w-px h-5 bg-border/60 mx-0.5" />
-            <Button size="sm" variant={selEl?.bold   ? 'default' : 'outline'} className="h-8 w-8 p-0"
+            <div className="w-px h-5 bg-border/60 mx-0.5 shrink-0" />
+            <Button size="sm" variant={selEl?.bold   ? 'default' : 'outline'} className="h-8 w-8 p-0 shrink-0"
                     title="Bold" onClick={() => toggleProp('bold')}>
               <Bold className="w-3 h-3" />
             </Button>
-            <Button size="sm" variant={selEl?.italic ? 'default' : 'outline'} className="h-8 w-8 p-0"
+            <Button size="sm" variant={selEl?.italic ? 'default' : 'outline'} className="h-8 w-8 p-0 shrink-0"
                     title="Italic" onClick={() => toggleProp('italic')}>
               <Italic className="w-3 h-3" />
             </Button>
-            <label className="cursor-pointer" title="Text colour">
+            <label className="cursor-pointer shrink-0" title="Text colour">
               <div className="flex items-center gap-1 h-8 px-2 text-xs border border-border
                               rounded-md hover:bg-muted/60 transition-colors">
                 <Palette className="w-3 h-3 text-muted-foreground" />
@@ -1075,15 +1089,17 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
                      value={selEl?.color || '#1a1a2e'}
                      onChange={e => setTextColor(e.target.value)} />
             </label>
-            {/* Font size input */}
-            <div className="flex items-center gap-1 h-8">
+            <div className="flex items-center gap-1 h-8 shrink-0">
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">Size:</span>
               <Input
-                type="number" min="8" max="200"
-                value={selEl ? Math.round((selEl.fontSizePct ?? DEF_FSZ) * cszR.current.h) : 24}
+                type="number"
+                min={8}
+                max={Math.min(200, Math.round((csz.h || 400) * 0.25))}
+                value={selEl && csz.h > 0 ? Math.round((selEl.fontSizePct ?? DEF_FSZ) * csz.h) : 24}
                 onChange={(e) => {
-                  const px = Math.max(8, Math.min(200, parseInt(e.target.value) || 24))
-                  const fontSizePct = px / cszR.current.h
+                  const canvasH = csz.h || 400
+                  const px = Math.max(8, Math.min(200, parseInt(e.target.value, 10) || 24))
+                  const fontSizePct = Math.max(MIN_TEXT_HPCT, Math.min(0.25, px / canvasH))
                   setElements(prev => prev.map(el =>
                     el.id === selectedId ? { ...el, fontSizePct } : el
                   ))
@@ -1093,8 +1109,24 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
               />
               <span className="text-[10px] text-muted-foreground">px</span>
             </div>
-            <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"
-                    onClick={() => { setEditId(selectedId); setTextInput(selEl?.text || '') }}>
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">Font:</span>
+              <select
+                value={selEl?.fontFamily ?? FONT_OPTIONS[0].value}
+                onChange={(e) => setElements(prev => prev.map(el =>
+                  el.id === selectedId ? { ...el, fontFamily: e.target.value } : el
+                ))}
+                className="h-8 px-2 text-xs border border-border rounded-md max-w-[140px] bg-background"
+                title="Font family"
+              >
+                {FONT_OPTIONS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+            <Button size="sm" variant="outline" className="h-8 gap-1 text-xs shrink-0"
+                    onClick={() => { setEditId(selectedId!); setTextInput(selEl?.text ?? '') }}
+                    title="Edit text content">
               <Type className="w-3 h-3" /> Edit
             </Button>
           </>
@@ -1191,7 +1223,7 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
                 if (e.key === 'Escape') setEditId(null)
               }}
               rows={2}
-              placeholder="Type your text here…"
+              placeholder="Your text here"
               className="w-full text-sm border border-blue-200 rounded-xl p-2.5 resize-none
                          outline-none focus:border-blue-400 bg-white"
             />

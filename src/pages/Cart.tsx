@@ -24,11 +24,18 @@ export default function Cart() {
   const donationCents    = calculateDonation(totalCents)
   const totalWithDonation = totalCents + donationCents + additionalDonation
 
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  const canCheckout = !!stripeKey
+
   const handleCheckout = async () => {
     if (items.length === 0) { toast('Your cart is empty', 'error'); return }
     if (!selectedCause || !selectedNonprofit) {
       toast('Please select a cause before checkout', 'error')
       navigate('/causes')
+      return
+    }
+    if (!canCheckout) {
+      toast('Payment integration is being configured. Checkout will be available soon.', 'error')
       return
     }
     setIsProcessing(true)
@@ -344,13 +351,18 @@ export default function Cart() {
                 </div>
               )}
 
+              {!canCheckout && (
+                <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                  Payment integration (Stripe) will be configured shortly. Your cart is saved — you can complete checkout once payment is ready.
+                </div>
+              )}
               <Button
                 size="lg"
                 className="w-full mt-4 h-13 text-base font-semibold gap-2 shadow-md
                            shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5
                            transition-all"
                 onClick={handleCheckout}
-                disabled={isProcessing || !selectedCause || !selectedNonprofit}
+                disabled={isProcessing || !selectedCause || !selectedNonprofit || !canCheckout}
               >
                 {isProcessing ? (
                   <><Loader2 className="h-4 w-4 animate-spin" />Processing…</>
