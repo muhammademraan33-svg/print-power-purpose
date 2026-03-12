@@ -20,8 +20,11 @@ export interface SinaLitePriceResponse {
 
 export const sinalitePriceApi = {
   async getProductOptions(productId: number, storeCode: string = 'en_ca'): Promise<any[]> {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const response = await fetch(`${supabaseUrl}/functions/v1/sinalite-price`, {
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+    const url = import.meta.env.DEV
+      ? '/api/sinalite-price'
+      : `${baseUrl}/functions/v1/sinalite-price`
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -45,8 +48,11 @@ export const sinalitePriceApi = {
     qty?: number,
     storeCode: string = 'en_ca'
   ): Promise<SinaLitePriceResponse> {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-    const response = await fetch(`${supabaseUrl}/functions/v1/sinalite-price`, {
+    const baseUrl = import.meta.env.DEV ? '' : (import.meta.env.VITE_SUPABASE_URL || '')
+    const url = import.meta.env.DEV
+      ? '/api/sinalite-price'
+      : `${baseUrl}/functions/v1/sinalite-price`
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

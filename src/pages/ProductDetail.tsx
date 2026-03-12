@@ -154,11 +154,13 @@ export default function ProductDetail() {
 
   // ── SinaLite price from API ─────────────────────────────────────────────
   const { data: sinalitePriceData, isLoading: sinalitePriceLoading } = useQuery({
-    queryKey: ['sinalite-price', id, source, sinaliteProductOptions, effectiveQuantity],
+    queryKey: ['sinalite-price', id, source, sinaliteProductOptions],
     queryFn: async () => {
       const productId = typeof localProduct?.id === 'number' ? localProduct.id : parseInt(String(localProduct?.id), 10)
       if (!Number.isFinite(productId) || sinaliteProductOptions.length === 0) return null
-      return sinalitePriceApi.calculatePrice(productId, sinaliteProductOptions, effectiveQuantity)
+      // SinaLite API: qty is encoded in the selected option IDs (including the "qty" option),
+      // so we don't pass an explicit qty argument here.
+      return sinalitePriceApi.calculatePrice(productId, sinaliteProductOptions)
     },
     enabled: !!localProduct && source === 'sinalite' && sinaliteProductOptions.length > 0,
     staleTime: 60_000,
@@ -255,18 +257,32 @@ export default function ProductDetail() {
     )
   }
 
-  const fallbackPriceCents = localProduct.basePriceCents ?? (localProduct as { priceCents?: number }).priceCents ?? 5000
-  const unitPriceCents = (() => {
+  const fallbackPriceCents =
+    localProduct.basePriceCents ?? (localProduct as { priceCents?: number }).priceCents ?? 5000
+
+  // Compute a job-total price first, then derive internal per-unit from it for cart math.
+  const jobTotalCents = (() => {
+    // SinaLite: API returns total job price for selected options + qty.
     if (source === 'sinalite' && sinalitePriceData?.price != null) {
       const parsed = parseFloat(String(sinalitePriceData.price))
-      return Number.isFinite(parsed) ? Math.round(parsed * 100) : fallbackPriceCents
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Math.round(parsed * 100)
+      }
+      // If API comes back 0/invalid (or CORS/other issues), fall back to stored base price (job total).
+      return fallbackPriceCents
     }
+
+    // Printify: helper returns a per-unit price; multiply by qty for job total.
     if (source === 'printify' && printifyPriceData?.priceCents != null) {
-      return printifyPriceData.priceCents
+      return printifyPriceData.priceCents * Math.max(1, effectiveQuantity)
     }
+
+    // Fallback for anything else: treat stored base price as a job total for current configuration.
     return fallbackPriceCents
   })()
-  const donationCents = calculateDonation(unitPriceCents * effectiveQuantity)
+
+  const unitPriceCents = Math.round(jobTotalCents / Math.max(1, effectiveQuantity))
+  const donationCents = calculateDonation(jobTotalCents)
   const priceLoading = (source === 'sinalite' && sinalitePriceLoading) || (source === 'printify' && printifyPriceLoading)
 
   // ─── Reusable content blocks ──────────────────────────────────────────────
@@ -427,14 +443,8 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* Price rows */}
+      {/* Price rows (no explicit unit price row, only totals/donation) */}
       <div className="space-y-2 pt-3 border-t border-border/40">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Unit Price</span>
-          <span className="font-semibold">
-            {priceLoading ? <span className="inline-flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</span> : formatPrice(unitPriceCents)}
-          </span>
-        </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground flex items-center gap-1">
             <Heart className="w-3 h-3 text-rose-400" /> Auto Donation (est.)
@@ -443,7 +453,7 @@ export default function ProductDetail() {
         </div>
         <div className="flex justify-between text-base font-bold pt-2 border-t border-border/40">
           <span>Subtotal</span>
-          <span>{priceLoading ? '…' : formatPrice(unitPriceCents * effectiveQuantity)}</span>
+          <span>{priceLoading ? '…' : formatPrice(jobTotalCents)}</span>
         </div>
       </div>
 
