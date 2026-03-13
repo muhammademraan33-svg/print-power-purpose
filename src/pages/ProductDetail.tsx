@@ -1,6 +1,6 @@
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -125,6 +125,27 @@ export default function ProductDetail() {
     ? (localOptions.length > 0 ? localOptions : [])
     : (localOptions.length > 0 ? localOptions : apiOptions)
 
+  // Reset selectedOptions when product changes so defaults apply to new product
+  useEffect(() => {
+    setSelectedOptions({})
+  }, [id])
+
+  // Initialize selectedOptions with defaults when optionGroups load (SinaLite only)
+  useEffect(() => {
+    if (source !== 'sinalite' || !optionGroups?.length) return
+    setSelectedOptions(prev => {
+      let changed = false
+      const next = { ...prev }
+      for (const g of optionGroups) {
+        if (next[g.name] === undefined && g.values?.[0]) {
+          next[g.name] = g.values[0]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [id, source, optionGroups])
+
   const hasQtyOption = source === 'sinalite' && optionGroups?.some((g) => g.name === 'qty')
   const qtyGroup = optionGroups?.find((g) => g.name === 'qty')
   const effectiveQuantity = hasQtyOption
@@ -142,19 +163,21 @@ export default function ProductDetail() {
 
   // Build SinaLite product option IDs for price API (use selected or first value per group)
   const sinaliteProductOptions = (() => {
-    if (source !== 'sinalite' || !localProduct?.optionIds || !optionGroups?.length) return []
-    const optionIds = (localProduct as { optionIds?: Record<string, Record<string, number>> }).optionIds
-    return optionGroups.flatMap((g) => {
+    if (source !== 'sinalite' || !optionGroups?.length) return []
+    const optionIds = (localProduct as { optionIds?: Record<string, Record<string, number>> })?.optionIds
+    const groupsWithIds = optionGroups as Array<{ name: string; values?: string[]; optionIds?: Record<string, number> }>
+    return groupsWithIds.flatMap((g) => {
       const value = selectedOptions[g.name] ?? g.values?.[0]
       if (!value) return []
-      const id = optionIds?.[g.name]?.[value]
-      return typeof id === 'number' ? [id] : []
-    })
+      // Top-level optionIds first, fallback to per-group optionIds
+      const optId = optionIds?.[g.name]?.[value] ?? g.optionIds?.[value]
+      return typeof optId === 'number' ? [optId] : []
+    }).filter(Boolean)
   })()
 
   // ── SinaLite price from API ─────────────────────────────────────────────
   const { data: sinalitePriceData, isLoading: sinalitePriceLoading } = useQuery({
-    queryKey: ['sinalite-price', id, source, sinaliteProductOptions],
+    queryKey: ['sinalite-price', id, source, JSON.stringify(sinaliteProductOptions)],
     queryFn: async () => {
       const productId = typeof localProduct?.id === 'number' ? localProduct.id : parseInt(String(localProduct?.id), 10)
       if (!Number.isFinite(productId) || sinaliteProductOptions.length === 0) return null
@@ -262,9 +285,10 @@ export default function ProductDetail() {
 
   // Compute a job-total price first, then derive internal per-unit from it for cart math.
   const jobTotalCents = (() => {
-    // SinaLite: API returns total job price for selected options + qty.
-    if (source === 'sinalite' && sinalitePriceData?.price != null) {
-      const parsed = parseFloat(String(sinalitePriceData.price))
+    // SinaLite: API returns total job price in price2.price (or price) for selected options + qty.
+    const sinaliteApiPrice = (sinalitePriceData as { price?: string; price2?: { price?: number } })?.price2?.price ?? (sinalitePriceData as { price?: string })?.price
+    if (source === 'sinalite' && sinaliteApiPrice != null) {
+      const parsed = parseFloat(String(sinaliteApiPrice))
       if (Number.isFinite(parsed) && parsed > 0) {
         // 100% markup on wholesale: retail = wholesale * 2
         return Math.round(parsed * 100 * 2)
