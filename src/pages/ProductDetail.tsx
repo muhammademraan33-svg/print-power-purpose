@@ -266,7 +266,8 @@ export default function ProductDetail() {
     if (source === 'sinalite' && sinalitePriceData?.price != null) {
       const parsed = parseFloat(String(sinalitePriceData.price))
       if (Number.isFinite(parsed) && parsed > 0) {
-        return Math.round(parsed * 100)
+        // 100% markup on wholesale: retail = wholesale * 2
+        return Math.round(parsed * 100 * 2)
       }
       // If API comes back 0/invalid (or CORS/other issues), fall back to stored base price (job total).
       return fallbackPriceCents
