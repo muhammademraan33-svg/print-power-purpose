@@ -72,7 +72,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const getTotal = useCallback(() => {
-    return items.reduce((total, item) => total + item.priceCents * item.quantity, 0)
+    return items.reduce((total, item) => {
+      // For job-priced items (e.g. SinaLite), trust the stored job total instead of unit * qty
+      if (item.jobTotalCents != null && item.jobTotalCents > 0) {
+        return total + item.jobTotalCents
+      }
+      return total + item.priceCents * item.quantity
+    }, 0)
   }, [items])
 
   const getItemCount = useCallback(() => {

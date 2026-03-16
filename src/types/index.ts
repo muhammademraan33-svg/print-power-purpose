@@ -94,6 +94,8 @@ export interface CartItem {
   name: string
   priceCents: number
   quantity: number
+  /** For job-priced items (e.g. SinaLite), this is the total job price including markup for the selected quantity. */
+  jobTotalCents?: number
   imageUrl?: string
   configuration?: Record<string, any>
   artworkFileName?: string

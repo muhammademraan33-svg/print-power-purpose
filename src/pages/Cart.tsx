@@ -178,28 +178,34 @@ export default function Cart() {
 
                     {/* Controls row */}
                     <div className="flex items-center gap-3 flex-wrap">
-                      {/* Qty stepper */}
-                      <div className="flex items-center rounded-xl border border-border overflow-hidden">
-                        <button
-                          onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
-                          className="w-8 h-8 flex items-center justify-center hover:bg-muted
-                                     transition-colors border-r border-border"
-                          aria-label="Decrease quantity"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="w-10 text-center text-sm font-semibold">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
-                          className="w-8 h-8 flex items-center justify-center hover:bg-muted
-                                     transition-colors border-l border-border"
-                          aria-label="Increase quantity"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
+                      {/* Qty: stepper for per-unit items, read-only for job-priced (SinaLite) */}
+                      {item.vendor === 'sinalite' ? (
+                        <div className="px-3 py-1.5 rounded-xl border border-border bg-muted text-sm font-semibold">
+                          Qty: {item.quantity}
+                        </div>
+                      ) : (
+                        <div className="flex items-center rounded-xl border border-border overflow-hidden">
+                          <button
+                            onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-muted
+                                       transition-colors border-r border-border"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-10 text-center text-sm font-semibold">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-muted
+                                       transition-colors border-l border-border"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
 
                       <button
                         onClick={() => removeItem(item.cartItemId)}
@@ -212,12 +218,20 @@ export default function Cart() {
                       </button>
 
                       <span className="font-bold text-base ml-auto hidden sm:block">
-                        {formatPrice(item.priceCents * item.quantity)}
+                        {formatPrice(
+                          item.jobTotalCents != null && item.jobTotalCents > 0
+                            ? item.jobTotalCents
+                            : item.priceCents * item.quantity
+                        )}
                       </span>
                     </div>
                     {/* Mobile price */}
                     <p className="sm:hidden font-bold text-base mt-2">
-                      {formatPrice(item.priceCents * item.quantity)}
+                      {formatPrice(
+                        item.jobTotalCents != null && item.jobTotalCents > 0
+                          ? item.jobTotalCents
+                          : item.priceCents * item.quantity
+                      )}
                     </p>
                   </div>
                 </div>
