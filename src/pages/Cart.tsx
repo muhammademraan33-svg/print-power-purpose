@@ -20,6 +20,20 @@ export default function Cart() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [additionalDonation, setAdditionalDonation] = useState(0)
 
+  const sinaLiteItems = items.filter((i) => i.vendor === 'sinalite')
+  const sinaLitePayloadPreview = {
+    items: sinaLiteItems.map((item) => {
+      const artworkUrl = item.artworkUrl || null
+      const fileType =
+        typeof artworkUrl === 'string' && artworkUrl.toLowerCase().includes('.pdf') ? 'pdf' : 'png'
+      return {
+        productId: item.productId,
+        options: item.configuration || {},
+        files: artworkUrl ? [{ type: fileType, url: artworkUrl }] : [],
+      }
+    }),
+  }
+
   const totalCents       = getTotal()
   const donationCents    = calculateDonation(totalCents)
   const totalWithDonation = totalCents + donationCents + additionalDonation
@@ -316,6 +330,28 @@ export default function Cart() {
                   <span>{formatPrice(totalWithDonation)}</span>
                 </div>
               </div>
+
+              {sinaLiteItems.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-border/40 rounded-xl bg-muted/20">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="font-bold text-sm text-foreground">SinaLite Payload Preview</h3>
+                    <button
+                      onClick={() => {
+                        const txt = JSON.stringify(sinaLitePayloadPreview, null, 2)
+                        navigator.clipboard.writeText(txt).catch(() => {})
+                        toast('SinaLite payload copied ✓', 'success')
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-border hover:border-primary/50 bg-background"
+                      type="button"
+                    >
+                      Copy JSON
+                    </button>
+                  </div>
+                  <pre className="text-[11px] leading-relaxed overflow-auto max-h-56 p-3 rounded-lg bg-background border border-border/50 whitespace-pre-wrap">
+                    {JSON.stringify(sinaLitePayloadPreview, null, 2)}
+                  </pre>
+                </div>
+              )}
 
               {/* Donation barometer */}
               <DonationBarometer

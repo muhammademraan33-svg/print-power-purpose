@@ -57,6 +57,16 @@ serve(async (req) => {
         unit_amount: item.priceCents,
       },
       quantity: item.quantity,
+      // Important: Stripe line-item metadata must contain everything we need later to
+      // build the SinaLite / Printify payload (final artwork URL + selected options).
+      metadata: {
+        productId: String(item.productId ?? ''),
+        vendor: String(item.vendor ?? ''),
+        artworkUrl: String(item.artworkUrl ?? ''),
+        configuration: JSON.stringify(item.configuration ?? {}),
+        designId: String(item.designId ?? ''),
+        preflightHash: String(item.preflightHash ?? ''),
+      },
     }))
 
     // Add donation as separate line item if > 0

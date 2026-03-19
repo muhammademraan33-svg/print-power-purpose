@@ -65,9 +65,24 @@ serve(async (req) => {
         .filter((item: any) => !item.description?.includes('Donation'))
         .map((item: any) => ({
           id: item.price?.product as string || '',
+          // Product id used by our fulfillment functions (SinaLite / Printify)
+          productId: parseInt(item.metadata?.productId ?? item.price?.product as string, 10) || 0,
+          vendor: item.metadata?.vendor || null,
+          artworkUrl: item.metadata?.artworkUrl || null,
+          configuration: (() => {
+            const raw = item.metadata?.configuration
+            if (!raw) return {}
+            try {
+              return JSON.parse(raw)
+            } catch {
+              return {}
+            }
+          })(),
           name: item.description || '',
           priceCents: item.amount_total,
           quantity: item.quantity || 1,
+          designId: item.metadata?.designId || null,
+          preflightHash: item.metadata?.preflightHash || null,
         }))
 
       // Calculate totals
@@ -218,13 +233,15 @@ serve(async (req) => {
       try {
         const items = order.items as any[]
         
-        // Check if order contains SinaLite products
-        const hasSinaLiteProducts = items.some((item: any) => 
-          item.vendor === 'sinalite' || (!item.vendor && !item.vendorProductId?.startsWith('printify:'))
-        )
-        
-        // Check if order contains Printify products
-        const hasPrintifyProducts = items.some((item: any) => item.vendor === 'printify' || item.vendorProductId?.startsWith('printify:'))
+          // Check if order contains SinaLite products
+          const hasSinaLiteProducts = items.some((item: any) =>
+            item.vendor === 'sinalite' || (!item.vendor && !item.vendorProductId?.startsWith('printify:'))
+          )
+
+          // Check if order contains Printify products
+          const hasPrintifyProducts = items.some((item: any) =>
+            item.vendor === 'printify' || item.vendorProductId?.startsWith('printify:')
+          )
 
         // Place SinaLite order if needed (async, don't await)
         if (hasSinaLiteProducts) {

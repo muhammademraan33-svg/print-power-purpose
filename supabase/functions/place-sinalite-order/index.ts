@@ -1,3 +1,5 @@
+// @ts-nocheck
+// Runs in Deno (Supabase Edge Function). IDE TS errors about Deno globals are expected.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -40,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId } = await req.json()
+    const { orderId, dryRun } = await req.json()
 
     if (!orderId) {
       return new Response(JSON.stringify({ error: 'Order ID required' }), {
@@ -71,11 +73,16 @@ serve(async (req) => {
     // Prepare SinaLite order
     // Note: This is a simplified version - you'll need to map WooCommerce products to SinaLite products
     const sinaliteOrder = {
-      items: order.items.map((item: any) => ({
-        productId: item.vendorProductId || item.productId, // Map to SinaLite product ID
-        options: item.configuration || {},
-        files: item.artworkUrl ? [{ type: 'pdf', url: item.artworkUrl }] : [],
-      })),
+      items: order.items.map((item: any) => {
+        const artworkUrl: string | null = item.artworkUrl || null
+        const fileType = typeof artworkUrl === 'string' && artworkUrl.toLowerCase().includes('.pdf') ? 'pdf' : 'png'
+        return {
+          // Map to SinaLite product ID
+          productId: item.vendorProductId || item.productId,
+          options: item.configuration || {},
+          files: artworkUrl ? [{ type: fileType, url: artworkUrl }] : [],
+        }
+      }),
       shippingInfo: {
         ShipFName: order.shipping_info?.first_name || '',
         ShipLName: order.shipping_info?.last_name || '',
@@ -102,6 +109,15 @@ serve(async (req) => {
         BillPhone: order.billing_info?.phone || '',
       },
       notes: `Order ${order.order_number} - Donation: $${(order.donation_cents / 100).toFixed(2)} to ${order.nonprofit_name || 'chosen cause'}`,
+    }
+
+    // Testing hook: let you inspect the exact payload we would send to SinaLite.
+    // IMPORTANT: In normal mode we still place the order.
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({ success: true, dryRun: true, sinaliteOrder }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
     }
 
     // Place order with SinaLite
