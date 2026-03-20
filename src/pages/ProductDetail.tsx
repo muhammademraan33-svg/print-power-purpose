@@ -17,6 +17,7 @@ import sinaliteData from '@/data/sinaliteProducts.json'
 import { supabaseAdmin } from '@/services/supabase'
 import { sinalitePriceApi } from '@/services/sinalite-price'
 import { fetchPrintifyPrice } from '@/services/printify-price'
+import { PDFDocument } from 'pdf-lib'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SinaliteOption       { id: number; group: string; name: string; hidden: number }
@@ -84,6 +85,69 @@ async function uploadDesignToSupabase(
     return urlData.publicUrl
   } catch (err) {
     console.warn('Supabase upload error:', err)
+    return null
+  }
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(',')[1]
+  if (!base64) return new Uint8Array()
+  const bytes = atob(base64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return arr
+}
+
+async function uploadSinalitePdfToSupabase(
+  frontDataUrl: string,
+  backDataUrl?: string,
+  productId?: string,
+): Promise<string | null> {
+  try {
+    if (!frontDataUrl) return null
+    const pdf = await PDFDocument.create()
+
+    const frontBytes = dataUrlToBytes(frontDataUrl)
+    const frontPng = await pdf.embedPng(frontBytes)
+    const frontPage = pdf.addPage([frontPng.width, frontPng.height])
+    frontPage.drawImage(frontPng, {
+      x: 0,
+      y: 0,
+      width: frontPng.width,
+      height: frontPng.height,
+    })
+
+    const hasBack = !!backDataUrl && backDataUrl.length > 0
+    if (hasBack) {
+      const backBytes = dataUrlToBytes(backDataUrl!)
+      const backPng = await pdf.embedPng(backBytes)
+      const backPage = pdf.addPage([backPng.width, backPng.height])
+      backPage.drawImage(backPng, {
+        x: 0,
+        y: 0,
+        width: backPng.width,
+        height: backPng.height,
+      })
+    }
+
+    const pdfBytes = await pdf.save()
+    // pdf-lib returns a typed array; cast for TS's BlobPart compatibility.
+    const blob = new Blob([pdfBytes as any], { type: 'application/pdf' })
+    const fileName = `designs/${productId || 'sinalite'}-${Date.now()}.pdf`
+
+    const { data, error } = await supabaseAdmin.storage
+      .from('designs')
+      .upload(fileName, blob, { contentType: 'application/pdf', upsert: false })
+
+    if (error || !data) {
+      console.warn('Supabase PDF upload failed (bucket may not exist yet):', error?.message)
+      return null
+    }
+
+    const { data: urlData } = supabaseAdmin.storage.from('designs').getPublicUrl(data.path)
+    return urlData.publicUrl
+  } catch (err) {
+    console.warn('Supabase PDF upload error:', err)
     return null
   }
 }
@@ -218,15 +282,39 @@ export default function ProductDetail() {
       }
 
       // Try Supabase upload (graceful fallback to dataUrl)
-      let uploadedUrl = result.dataUrl
+      let uploadedUrl: string | null = result.dataUrl
       if (result.dataUrl) {
-        const supabaseUrl = await uploadDesignToSupabase(result.dataUrl, String(localProduct.id))
-        if (supabaseUrl) {
-          uploadedUrl = supabaseUrl
-          toast('Print file uploaded to storage ✓', 'success')
+        if (source === 'sinalite') {
+          // SinaLite requires a PDF file. If a back-side design exists, include it too.
+          const frontDataUrl = result.dataSide === 'front' ? result.dataUrl : result.backDataUrl
+          const backDataUrl = result.dataSide === 'front' ? result.backDataUrl : result.dataUrl
+
+          const page1 = frontDataUrl || backDataUrl
+          const page2 = frontDataUrl && backDataUrl ? backDataUrl : undefined
+
+          if (page1) {
+            const pdfUrl = await uploadSinalitePdfToSupabase(page1, page2, String(localProduct.id))
+            if (pdfUrl) {
+              uploadedUrl = pdfUrl
+              toast('SinaLite PDF uploaded to storage ✓', 'success')
+            } else {
+              // SinaLite expects PDF for validation; do not fall back to PNG/base64.
+              toast('PDF upload failed. Please try again.', 'error')
+              setFinalizeErrors(['Failed to generate/upload SinaLite PDF output.'])
+              setFinalizing(false)
+              return
+            }
+          }
         } else {
-          toast('Stored design locally (Supabase not yet configured)', 'success')
+          const supabaseUrl = await uploadDesignToSupabase(result.dataUrl, String(localProduct.id))
+          if (supabaseUrl) {
+            uploadedUrl = supabaseUrl
+            toast('Print file uploaded to storage ✓', 'success')
+          } else {
+            toast('Stored design locally (Supabase not yet configured)', 'success')
+          }
         }
+
         setArtworkUrl(uploadedUrl)
         setDesignReady(true)
       }

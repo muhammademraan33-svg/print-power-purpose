@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Trash2, Minus, Plus, ShoppingCart, Loader2,
-  Heart, Shield, ChevronRight, ArrowRight, Package, CheckCircle2, FileImage,
+  Heart, Shield, ChevronRight, ArrowRight, Package, CheckCircle2, FileImage, FileText,
 } from 'lucide-react'
 import { formatPrice, calculateDonation } from '@/lib/utils'
 import { stripeApi } from '@/services/stripe'
@@ -167,10 +167,25 @@ export default function Cart() {
                       <div className="flex items-center gap-2 mb-3">
                         {/* Show thumbnail only if it's a real URL (not base64 which is huge) */}
                         {item.artworkUrl.startsWith('https://') && (
-                          <a href={item.artworkUrl} target="_blank" rel="noopener noreferrer"
-                             className="shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-emerald-200
-                                        hover:opacity-80 transition-opacity" title="View print file">
-                            <img src={item.artworkUrl} alt="Design" className="w-full h-full object-cover" />
+                          <a
+                            href={item.artworkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-emerald-200
+                                       hover:opacity-80 transition-opacity"
+                            title="View print file"
+                          >
+                            {item.artworkUrl.toLowerCase().includes('.pdf') ? (
+                              <div className="w-full h-full bg-emerald-50 flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-emerald-700" />
+                              </div>
+                            ) : (
+                              <img
+                                src={item.artworkUrl}
+                                alt="Design"
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                           </a>
                         )}
                         <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full

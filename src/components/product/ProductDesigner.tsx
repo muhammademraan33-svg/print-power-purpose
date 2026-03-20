@@ -62,6 +62,8 @@ interface Interaction {
 
 export interface FinalizeResult {
   dataUrl: string
+  /** Which side `dataUrl` represents (front/back). */
+  dataSide: 'front' | 'back'
   /** High-res PNG for the back side (present only when a back-side design exists). */
   backDataUrl?: string
   pass: boolean
@@ -809,7 +811,15 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
   // ── Finalize (exposed via ref) ────────────────────────────────────────────
   /** Renders a 300 DPI PNG, runs preflight, returns result. No download. */
   const finalize = useCallback(async (): Promise<FinalizeResult> => {
-    const EMPTY: FinalizeResult = { dataUrl: '', pass: false, errors: [], warnings: [], preflightHash: '', designId: designIdRef.current }
+    const EMPTY: FinalizeResult = {
+      dataUrl: '',
+      dataSide: activeSide,
+      pass: false,
+      errors: [],
+      warnings: [],
+      preflightHash: '',
+      designId: designIdRef.current,
+    }
 
     const canvas = canvasRef.current
     if (!canvas) return { ...EMPTY, errors: ['Canvas not ready'] }
@@ -843,7 +853,15 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
     // Hard stop on errors
     if (!pfResult.pass) {
       setSelId(prevSel)
-      return { dataUrl: '', pass: false, errors: pfResult.errors, warnings: pfResult.warnings, preflightHash, designId }
+      return {
+        dataUrl: '',
+        dataSide: activeSide,
+        pass: false,
+        errors: pfResult.errors,
+        warnings: pfResult.warnings,
+        preflightHash,
+        designId,
+      }
     }
 
     // Build high-res off-screen canvas (full bleed area at 300 DPI)
@@ -916,7 +934,16 @@ const ProductDesigner = forwardRef<DesignerRef, Props>(
       backDataUrl = offBack.toDataURL('image/png')
     }
 
-    return { dataUrl, backDataUrl, pass: true, errors: [], warnings: pfResult.warnings, preflightHash, designId }
+    return {
+      dataUrl,
+      dataSide: activeSide,
+      backDataUrl,
+      pass: true,
+      errors: [],
+      warnings: pfResult.warnings,
+      preflightHash,
+      designId,
+    }
   }, [draw, commitEdit, onDesignExport, runPreflight, activeSide])
 
   // Expose finalize + hasContent to parent via ref

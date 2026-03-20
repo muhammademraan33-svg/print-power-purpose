@@ -302,10 +302,11 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
         const warnings: string[] = []
 
         const activeSrcForFinalize = activeSide === 'back' ? backDesignSrc : designSrc
-        if (!activeSrcForFinalize) {
+          if (!activeSrcForFinalize) {
           errors.push('No design uploaded. Please upload a design image.')
           return {
             dataUrl: '',
+              dataSide: activeSide === 'back' ? 'back' : 'front',
             pass: false,
             errors,
             warnings,
@@ -325,7 +326,15 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
           }
         }
         if (errors.length > 0) {
-          return { dataUrl: '', pass: false, errors, warnings, preflightHash: '', designId: String(_pid) }
+          return {
+            dataUrl: '',
+            dataSide: activeSide === 'back' ? 'back' : 'front',
+            pass: false,
+            errors,
+            warnings,
+            preflightHash: '',
+            designId: String(_pid),
+          }
         }
 
         // Export design-only PNG at 300 DPI equivalent
@@ -370,6 +379,7 @@ const ApparelDesigner = forwardRef<DesignerRef, Props>(
 
         return {
           dataUrl,
+          dataSide: activeSide === 'back' ? 'back' : 'front',
           pass: true,
           errors: [],
           warnings,
